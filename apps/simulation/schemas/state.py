@@ -21,7 +21,7 @@ class WorldState(BaseModel):
 
     run_id: RunID
     turn: TurnNumber
-    grid: tuple[tuple[CellState, ...], ...]  # full 8×8 (or larger) grid; ground truth
+    grid: tuple[tuple[CellState, ...], ...]  # full grid (at least GRID_MIN_SIZE × GRID_MIN_SIZE); ground truth
     agent_positions: dict[AgentID, Position]
     key_held_by: AgentID | None
     door_unlocked: bool
@@ -44,7 +44,8 @@ class AgentBeliefState(BaseModel):
     agent_id: AgentID
     turn: TurnNumber
     believed_position: Position
-    # Serialized as list-of-pairs [[row, col], cell_type] for JSON round-trip safety.
+    # Serialized as a list of [position, cell_type] pairs for JSON round-trip safety
+    # (JSON object keys must be strings; tuple keys are not supported natively).
     believed_grid: dict[Position, CellType]  # agent's internal world map
     has_key: bool
     known_agent_positions: dict[AgentID, Position]  # may be stale
