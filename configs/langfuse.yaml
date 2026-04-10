@@ -1,1 +1,4 @@
-#
+project: dungeonAgents-ProveAI
+host: ${LANGFUSE_HOST}
+flush_interval_ms: 500
+debug: false

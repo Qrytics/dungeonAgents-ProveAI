@@ -1,1 +1,4 @@
-#
+service_name: dungeonAgents-ProveAI
+exporter_endpoint: http://localhost:4318/v1/traces
+batch_size: 512
+export_interval_ms: 1000
