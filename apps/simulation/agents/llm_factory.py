@@ -3,8 +3,15 @@
 Provides :func:`build_llm` which returns an appropriate LangChain chat model
 based on the model name string:
 
-* Model names that start with ``"gemini-"`` → :class:`~langchain_google_genai.ChatGoogleGenerativeAI`
-  (reads ``GOOGLE_API_KEY`` from the environment).
+* Model names that start with ``"gemini-"`` → Google provider, chosen automatically:
+
+  - If ``GOOGLE_APPLICATION_CREDENTIALS`` is set (service-account JSON path),
+    :class:`~langchain_google_vertexai.ChatVertexAI` is used (Vertex AI).
+    You must also set ``VERTEXAI_PROJECT`` and ``VERTEXAI_LOCATION``
+    (e.g. ``us-central1``).
+  - Otherwise :class:`~langchain_google_genai.ChatGoogleGenerativeAI` is used
+    (Gemini API; requires ``GOOGLE_API_KEY``).
+
 * All other model names → :class:`~langchain_openai.ChatOpenAI`
   (reads ``OPENAI_API_KEY`` from the environment).
 
@@ -12,13 +19,29 @@ Usage example::
 
     from apps.simulation.agents.llm_factory import build_llm
 
-    llm = build_llm("gemini-2.0-flash")
+    llm = build_llm("gemini-2.5-flash-lite")
     llm_with_tools = llm.bind_tools(tools, tool_choice="required")
 """
 
 from __future__ import annotations
 
+import os
+
 from langchain_core.language_models.chat_models import BaseChatModel
+
+
+def _resolve_gemini_provider() -> str:
+    """Return ``"vertex_ai"`` when a service-account credential file is
+    configured, otherwise ``"gemini_api"``.
+
+    The detection is based on the ``GOOGLE_APPLICATION_CREDENTIALS``
+    environment variable, which points to a service-account JSON key file
+    used by the Vertex AI provider.  When it is absent the standard Gemini
+    API (``GOOGLE_API_KEY``) is used instead.
+    """
+    if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+        return "vertex_ai"
+    return "gemini_api"
 
 
 def build_llm(model_name: str, **kwargs) -> BaseChatModel:
@@ -28,9 +51,13 @@ def build_llm(model_name: str, **kwargs) -> BaseChatModel:
     correct LangChain integration class.  Extra keyword arguments are
     forwarded to the underlying constructor (e.g. ``temperature``).
 
+    For Gemini model names the provider is chosen automatically based on the
+    ``GOOGLE_APPLICATION_CREDENTIALS`` environment variable (see module
+    docstring).
+
     Args:
-        model_name: LLM model identifier, e.g. ``"gpt-4o-mini"`` or
-            ``"gemini-2.0-flash"``.
+        model_name: LLM model identifier, e.g. ``"gpt-4o-mini"``,
+            ``"gemini-2.0-flash"``, or ``"gemini-2.5-flash-lite"``.
         **kwargs: Additional arguments forwarded to the model constructor.
 
     Returns:
@@ -38,10 +65,21 @@ def build_llm(model_name: str, **kwargs) -> BaseChatModel:
         instance ready to call.
 
     Raises:
-        ImportError: If ``langchain-google-genai`` is not installed and a
-            Gemini model is requested.
+        ImportError: If the required provider package is not installed.
     """
     if model_name.startswith("gemini-"):
+        if _resolve_gemini_provider() == "vertex_ai":
+            try:
+                from langchain_google_vertexai import ChatVertexAI  # type: ignore[import]
+            except ImportError as exc:
+                raise ImportError(
+                    "Vertex AI models require 'langchain-google-vertexai'. "
+                    "Install it with:  pip install langchain-google-vertexai"
+                ) from exc
+            project = os.environ.get("VERTEXAI_PROJECT")
+            location = os.environ.get("VERTEXAI_LOCATION", "us-central1")
+            return ChatVertexAI(model_name=model_name, project=project, location=location, **kwargs)
+
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI  # type: ignore[import]
         except ImportError as exc:
