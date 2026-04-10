@@ -18,8 +18,6 @@ Usage example::
 
 from __future__ import annotations
 
-import os
-
 from langchain_core.language_models.chat_models import BaseChatModel
 
 
@@ -51,8 +49,7 @@ def build_llm(model_name: str, **kwargs) -> BaseChatModel:
                 "Gemini models require 'langchain-google-genai'. "
                 "Install it with:  pip install langchain-google-genai"
             ) from exc
-        api_key: str = os.environ.get("GOOGLE_API_KEY", "")
-        return ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, **kwargs)
+        return ChatGoogleGenerativeAI(model=model_name, **kwargs)
 
     from langchain_openai import ChatOpenAI
 
