@@ -15,3 +15,14 @@
 ### Phase 3: Automated Scaffolding
 * **Agentic Orchestration:** Utilize a Copilot or AI agent to process the research paper and specifications.
 * **Repository Bootstrapping:** Have the agent submit a Pull Request (PR) to set up the basic folder scaffolding, including `/apps`, `/packages`, and shared configuration files.
+
+### Phase 4: Modular Implementation
+* **Workstream A: Core Engine & State Machine**
+    * Implementing the langgraph state transitions for the Dungeon Master (DM) and the Turn-based loop.
+    * Ensuring the Deterministic Replay logic is functional for debugging without LLM costs.
+* **Workstream B: Agent Perception & Tooling**
+    * Building out the Pydantic schemas for Movement, Attack, and Examine tools.
+    * Testing the "Fog of War" logic to ensure agents only receive local grid data.
+* **Workstream C: Legibility Layer (Dashboard)**
+    * Setting up the Streamlit interface to visualize the runs.jsonl output in real-time.
+    * Integrating Langfuse trackers to monitor token consumption and "Epistemic Divergence."
