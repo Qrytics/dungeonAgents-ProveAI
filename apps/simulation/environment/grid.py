@@ -54,6 +54,14 @@ class DungeonGrid:
     # Public API
     # ------------------------------------------------------------------
 
+    @property
+    def rows(self) -> int:
+        return self._rows
+
+    @property
+    def cols(self) -> int:
+        return self._cols
+
     def get_cell(self, pos: Position) -> CellState:
         row, col = pos
         self._validate_pos(pos)
