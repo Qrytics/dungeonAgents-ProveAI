@@ -47,3 +47,24 @@
     ```bash
     streamlit run apps/legibility/app.py
     ```
+
+### Final Attempt Evidence
+      (.venv) PS C:\Users\mario\Downloads\git-projects\dungeonAgents-ProveAI> python -m apps.simulation.main --verbose
+
+      ── Turn 0 ────────────────────────────────────────
+        Agent A: (2, 1)  Agent B: (4, 3)  |  Key: floor  |  Door: locked
+
+      ── Turn 1 ────────────────────────────────────────
+        Agent A: (1, 1)  Agent B: (4, 3)  |  Key: floor  |  Door: locked
+      
+      ── Turn 2 ────────────────────────────────────────
+        Agent A: (1, 1)  Agent B: (4, 4)  |  Key: held by agent_a  |  Door: locked
+        DM: Agent A cautiously navigates a dimly lit corridor, their path blocked by a locked door. Meanwhile, Agent B ventures deeper into the labyrinth, the promise of escape a distant glimmer.
+
+      ── Turn 3 ────────────────────────────────────────
+        Agent A: (1, 1)  Agent B: (4, 4)  |  Key: held by agent_a  |  Door: locked
+        DM: The adventurers begin their escape, agent_a starting near a gleaming key, while agent_b is already deep within the dungeon's winding corridors. A locked door blocks a promising path ahead.
+
+      ── Turn 4 ────────────────────────────────────────
+        Agent A: (1, 1)  Agent B: (3, 4)  |  Key: held by agent_a  |  Door: locked
+        DM: Agent A, clutching a key, stands near the entrance, while Agent B navigates the central corridors. The locked door looms, a potential obstacle to their escape.
