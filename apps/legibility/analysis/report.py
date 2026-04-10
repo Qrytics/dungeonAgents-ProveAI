@@ -67,20 +67,39 @@ def _build_timeline(event_log_path: Path) -> list[str]:
 
 
 def _call_llm(prompt: str) -> str:
-    """Call the configured LLM and return the text response."""
+    """Call the configured LLM and return the text response.
+
+    Supports OpenAI models (e.g. gpt-4o-mini) and Google Gemini models
+    (e.g. gemini-2.0-flash) via Gemini's OpenAI-compatible endpoint.
+    The model is selected by the AGENT_LLM_MODEL environment variable.
+    """
     try:
         from openai import OpenAI  # type: ignore[import-untyped]
     except ImportError as exc:
         raise ImportError("openai package is required for generate_report()") from exc
 
-    client = OpenAI()
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    if not api_key:
-        raise EnvironmentError(
-            "OPENAI_API_KEY environment variable is not set. "
-            "Set it before calling generate_report()."
-        )
     model = os.environ.get("AGENT_LLM_MODEL", "gpt-4o-mini")
+
+    if model.startswith("gemini"):
+        api_key = os.environ.get("GOOGLE_API_KEY", "")
+        if not api_key:
+            raise EnvironmentError(
+                "GOOGLE_API_KEY environment variable is not set. "
+                "Set it before calling generate_report() with a Gemini model."
+            )
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        )
+    else:
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        if not api_key:
+            raise EnvironmentError(
+                "OPENAI_API_KEY environment variable is not set. "
+                "Set it before calling generate_report()."
+            )
+        client = OpenAI(api_key=api_key)
+
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
