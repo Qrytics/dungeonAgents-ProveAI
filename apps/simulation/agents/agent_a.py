@@ -27,8 +27,8 @@ import time
 from typing import cast
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
+from apps.simulation.agents.llm_factory import build_llm
 from apps.simulation.agents.state import AgentBeliefStateManager
 from apps.simulation.agents.tools import (
     TOOL_CONTEXT_KEY,
@@ -110,7 +110,7 @@ def agent_a_node(state: LangGraphState) -> LangGraphState:
         belief_manager.update_from_perception(perception)
 
     model_name: str = os.environ.get("AGENT_LLM_MODEL", "gpt-4o-mini")
-    llm = ChatOpenAI(model=model_name).bind_tools(_TOOLS, tool_choice="required")
+    llm = build_llm(model_name).bind_tools(_TOOLS, tool_choice="required")
 
     prompt_tokens: int = 0
     completion_tokens: int = 0

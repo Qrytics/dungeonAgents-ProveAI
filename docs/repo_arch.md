@@ -3,6 +3,73 @@
 > Source: `README.md` — File Architecture section.
 > This file is the canonical reference for the folder and file layout of this monorepo.
 
+---
+
+## Environment Variables
+
+All runtime secrets are read from environment variables (never hard-coded).
+Copy `.env.example` to `.env` and fill in the values relevant to your chosen LLM provider.
+
+| Variable | Required | Description |
+|---|---|---|
+| `GOOGLE_API_KEY` | Gemini only | Google AI Studio API key. Get it at https://aistudio.google.com/app/apikey |
+| `OPENAI_API_KEY` | OpenAI only | OpenAI platform API key. Get it at https://platform.openai.com/api-keys |
+| `AGENT_LLM_MODEL` | Yes | LLM model name — drives provider selection (see below) |
+| `LANGFUSE_PUBLIC_KEY` | Yes | Langfuse project public key |
+| `LANGFUSE_SECRET_KEY` | Yes | Langfuse project secret key |
+| `LANGFUSE_HOST` | Yes | Langfuse host (default: `https://cloud.langfuse.com`) |
+
+### Setting `GOOGLE_API_KEY` — platform-specific examples
+
+**Bash / macOS / Linux:**
+```bash
+export GOOGLE_API_KEY="your_key_here"
+export AGENT_LLM_MODEL="gemini-2.0-flash"
+```
+
+**Windows PowerShell:**
+```powershell
+$env:GOOGLE_API_KEY = "your_key_here"
+$env:AGENT_LLM_MODEL = "gemini-2.0-flash"
+```
+
+**`.env` file (loaded automatically at startup):**
+```
+GOOGLE_API_KEY=your_key_here
+AGENT_LLM_MODEL=gemini-2.0-flash
+```
+
+---
+
+## LLM Provider Selection
+
+The `AGENT_LLM_MODEL` environment variable controls which LLM provider is used
+for all three agents (Agent A, Agent B, Dungeon Master).  The selection logic
+lives in `apps/simulation/agents/llm_factory.py`:
+
+| Model name prefix | Provider class | Required key |
+|---|---|---|
+| `gemini-*` | `ChatGoogleGenerativeAI` | `GOOGLE_API_KEY` |
+| anything else | `ChatOpenAI` | `OPENAI_API_KEY` |
+
+**Recommended Gemini models:**
+
+| Model | Notes |
+|---|---|
+| `gemini-2.0-flash` | Fast, low-cost — recommended for development |
+| `gemini-1.5-pro` | Higher capability |
+
+**Recommended OpenAI models:**
+
+| Model | Notes |
+|---|---|
+| `gpt-4o-mini` | Default — fast and low-cost |
+| `gpt-4o` | Higher capability |
+
+---
+
+## File Layout
+
 ```
 dungeonAgents-ProveAI/
 │
@@ -28,6 +95,7 @@ dungeonAgents-ProveAI/
 │   │   │   └── orchestrator.py     # Environment Orchestrator / Dungeon Master logic
 │   │   │
 │   │   ├── agents/                 # LLM agent definitions
+│   │   │   ├── llm_factory.py      # Provider-agnostic LLM factory (OpenAI & Gemini)
 │   │   │   ├── agent_a.py          # Agent A — LangGraph node definition
 │   │   │   ├── agent_b.py          # Agent B — LangGraph node definition
 │   │   │   ├── dungeon_master.py   # DM agent — operates on stale state (N-2 turns)
@@ -105,25 +173,26 @@ dungeonAgents-ProveAI/
 | `apps/simulation/environment/perception.py` | M-04 | Fog-of-war engine |
 | `apps/simulation/environment/interaction.py` | M-05 | Action validation |
 | `apps/simulation/environment/orchestrator.py` | M-06 | Event application & replay |
-| `apps/simulation/agents/tools.py` | M-07 | LangGraph tool definitions |
-| `apps/simulation/agents/state.py` | M-08 | Agent belief state manager |
-| `apps/simulation/agents/agent_a.py` | M-09 | Agent A LangGraph node |
-| `apps/simulation/agents/agent_b.py` | M-09 | Agent B LangGraph node |
-| `apps/simulation/agents/dungeon_master.py` | M-10 | Dungeon Master agent |
-| `apps/simulation/game_loop/message_queue.py` | M-11 | Communication lag queue |
-| `apps/simulation/game_loop/loop.py` | M-11 | Turn-based game loop |
-| `apps/simulation/main.py` | M-12 | CLI entry point |
-| `packages/observability/tracer.py` | M-13 | OTel + Langfuse tracer |
-| `packages/observability/spans.py` | M-13 | Span context managers |
-| `packages/observability/metrics.py` | M-13 | Custom OTel metrics |
-| `apps/legibility/analysis/divergence.py` | M-14 | Divergence metric |
-| `apps/legibility/analysis/report.py` | M-15 | Causal incident report |
-| `apps/legibility/views/replay.py` | M-16 | Replay dashboard view |
-| `apps/legibility/views/causal_graph.py` | M-16 | Causal graph view |
-| `apps/legibility/views/timeline.py` | M-16 | Gantt timeline view |
-| `apps/legibility/views/heatmaps.py` | M-16 | Heatmap view |
-| `apps/legibility/app.py` | M-17 | Streamlit app shell |
-| `pyproject.toml`, `requirements.txt`, `configs/`, `.env.example` | M-18 | Config & devops |
-| `tests/test_environment/` | M-19 | Environment unit tests |
-| `tests/test_agents/` | M-20 | Agent tools unit tests |
-| `tests/test_legibility/` | M-21 | Legibility unit tests |
+| `apps/simulation/agents/llm_factory.py` | M-07 | LLM provider factory (OpenAI & Gemini) |
+| `apps/simulation/agents/tools.py` | M-08 | LangGraph tool definitions |
+| `apps/simulation/agents/state.py` | M-09 | Agent belief state manager |
+| `apps/simulation/agents/agent_a.py` | M-10 | Agent A LangGraph node |
+| `apps/simulation/agents/agent_b.py` | M-10 | Agent B LangGraph node |
+| `apps/simulation/agents/dungeon_master.py` | M-11 | Dungeon Master agent |
+| `apps/simulation/game_loop/message_queue.py` | M-12 | Communication lag queue |
+| `apps/simulation/game_loop/loop.py` | M-12 | Turn-based game loop |
+| `apps/simulation/main.py` | M-13 | CLI entry point |
+| `packages/observability/tracer.py` | M-14 | OTel + Langfuse tracer |
+| `packages/observability/spans.py` | M-14 | Span context managers |
+| `packages/observability/metrics.py` | M-14 | Custom OTel metrics |
+| `apps/legibility/analysis/divergence.py` | M-15 | Divergence metric |
+| `apps/legibility/analysis/report.py` | M-16 | Causal incident report |
+| `apps/legibility/views/replay.py` | M-17 | Replay dashboard view |
+| `apps/legibility/views/causal_graph.py` | M-17 | Causal graph view |
+| `apps/legibility/views/timeline.py` | M-17 | Gantt timeline view |
+| `apps/legibility/views/heatmaps.py` | M-17 | Heatmap view |
+| `apps/legibility/app.py` | M-18 | Streamlit app shell |
+| `pyproject.toml`, `requirements.txt`, `configs/`, `.env.example` | M-19 | Config & devops |
+| `tests/test_environment/` | M-20 | Environment unit tests |
+| `tests/test_agents/` | M-21 | Agent tools unit tests |
+| `tests/test_legibility/` | M-22 | Legibility unit tests |

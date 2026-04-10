@@ -22,10 +22,232 @@ The primary deliverable is **not** agent intelligence — it is the quality of t
 |---|---|
 | Language | Python 3.12+ |
 | Agent Framework | LangGraph |
+| LLM Providers | OpenAI (gpt-4o-mini, gpt-4o) **and** Google Gemini (gemini-2.0-flash, gemini-1.5-pro) |
 | Observability | Langfuse + OpenTelemetry (OTel) |
 | State & Validation | Pydantic V2 |
 | Legibility UI | Streamlit |
 | Event Storage | Immutable `.jsonl` flat files |
+
+---
+
+## Prerequisites
+
+- **Python 3.12 or higher** — verify with `python --version`
+- **pip** — comes bundled with Python
+- An API key for at least one LLM provider:
+  - **Google Gemini** (recommended): get a free key at https://aistudio.google.com/app/apikey
+  - **OpenAI**: get a key at https://platform.openai.com/api-keys
+- (Optional) **Langfuse** account for trace storage: https://cloud.langfuse.com
+
+---
+
+## Setup
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Qrytics/dungeonAgents-ProveAI.git
+cd dungeonAgents-ProveAI
+```
+
+### 2. Create and activate a virtual environment
+
+**macOS / Linux:**
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+**Windows PowerShell:**
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -e .
+```
+
+> This installs the project in editable mode along with all runtime dependencies
+> including `langchain-google-genai` (Gemini) and `langchain-openai`.
+
+### 4. Configure environment variables
+
+Copy the example file and fill in your keys:
+
+```bash
+cp .env.example .env
+```
+
+Then open `.env` and set the values.  You only need the key for the provider you intend to use.
+
+**Minimal setup for Gemini (recommended):**
+```
+GOOGLE_API_KEY=your_google_api_key_here
+AGENT_LLM_MODEL=gemini-2.0-flash
+
+LANGFUSE_PUBLIC_KEY=your_langfuse_public_key
+LANGFUSE_SECRET_KEY=your_langfuse_secret_key
+LANGFUSE_HOST=https://cloud.langfuse.com
+```
+
+**Minimal setup for OpenAI:**
+```
+OPENAI_API_KEY=your_openai_key_here
+AGENT_LLM_MODEL=gpt-4o-mini
+
+LANGFUSE_PUBLIC_KEY=your_langfuse_public_key
+LANGFUSE_SECRET_KEY=your_langfuse_secret_key
+LANGFUSE_HOST=https://cloud.langfuse.com
+```
+
+#### Setting variables without a `.env` file (PowerShell)
+
+If you prefer to set variables directly in your shell session:
+
+```powershell
+$env:GOOGLE_API_KEY = "your_google_api_key_here"
+$env:AGENT_LLM_MODEL = "gemini-2.0-flash"
+$env:LANGFUSE_PUBLIC_KEY = "your_langfuse_public_key"
+$env:LANGFUSE_SECRET_KEY = "your_langfuse_secret_key"
+$env:LANGFUSE_HOST = "https://cloud.langfuse.com"
+```
+
+**macOS / Linux (Bash):**
+```bash
+export GOOGLE_API_KEY="your_google_api_key_here"
+export AGENT_LLM_MODEL="gemini-2.0-flash"
+export LANGFUSE_PUBLIC_KEY="your_langfuse_public_key"
+export LANGFUSE_SECRET_KEY="your_langfuse_secret_key"
+export LANGFUSE_HOST="https://cloud.langfuse.com"
+```
+
+#### LLM provider selection
+
+The project auto-selects the right LangChain integration based on the model name set in `AGENT_LLM_MODEL`:
+
+| `AGENT_LLM_MODEL` value | Provider used | Key needed |
+|---|---|---|
+| `gemini-2.0-flash` | Google Gemini | `GOOGLE_API_KEY` |
+| `gemini-1.5-pro` | Google Gemini | `GOOGLE_API_KEY` |
+| `gpt-4o-mini` | OpenAI | `OPENAI_API_KEY` |
+| `gpt-4o` | OpenAI | `OPENAI_API_KEY` |
+
+Any model name starting with `gemini-` routes to Gemini; everything else routes to OpenAI.
+
+---
+
+## Running the Simulation
+
+The simulation is launched from the repository root using the Python module runner.
+
+### Basic run (default 8×8 grid, uses `AGENT_LLM_MODEL` from env)
+
+```bash
+python -m apps.simulation.main
+```
+
+### Verbose output (prints turn-by-turn narration)
+
+```bash
+python -m apps.simulation.main --verbose
+```
+
+### Reproducible run with a fixed seed
+
+```bash
+python -m apps.simulation.main --seed 42
+```
+
+### Larger grid
+
+```bash
+python -m apps.simulation.main --rows 12 --cols 12
+```
+
+### Specify a model on the command line
+
+```bash
+python -m apps.simulation.main --model gemini-2.0-flash
+```
+
+> `--model` overrides the `AGENT_LLM_MODEL` environment variable for that single run.
+
+### All CLI options
+
+```
+usage: python -m apps.simulation.main [OPTIONS]
+
+Options:
+  --rows INT      Grid rows (default: 8, min: 8)
+  --cols INT      Grid columns (default: 8, min: 8)
+  --seed INT      Random seed for reproducible layout
+  --model TEXT    LLM model name (default: reads AGENT_LLM_MODEL env var)
+  --runs-dir PATH Output directory for event logs (default: runs/)
+  --verbose       Print turn-by-turn narration to stdout
+```
+
+After each run the console prints:
+```
+Run ID: <uuid>
+Result: WIN | TURN_LIMIT | STUCK
+Turns: <n>
+Event log: runs/<uuid>.jsonl
+```
+
+The full event log is saved as a `.jsonl` file under `runs/`.
+
+---
+
+## Running the Legibility Dashboard
+
+The Streamlit dashboard lets you inspect any saved run visually.
+
+```bash
+streamlit run apps/legibility/app.py
+```
+
+Then open http://localhost:8501 in your browser.  From there you can:
+
+- **Replay** the simulation turn-by-turn (ground truth vs. agent belief side-by-side)
+- **Causal graph** — trace failures backward to root cause nodes
+- **Gantt timeline** — see concurrent agent activity and idle gaps
+- **Belief heatmaps** — spatial view of confidence and epistemic divergence
+
+---
+
+## Running the Tests
+
+All tests use **pytest** and require no API keys — they mock LLM calls.
+
+### Run the full test suite
+
+```bash
+pytest
+```
+
+### Run a specific test module
+
+```bash
+pytest tests/test_environment/test_grid.py
+pytest tests/test_environment/test_perception.py
+pytest tests/test_agents/test_tools.py
+pytest tests/test_legibility/test_divergence.py
+```
+
+### Run with verbose output
+
+```bash
+pytest -v
+```
+
+### Run only tests matching a keyword
+
+```bash
+pytest -k "grid"
+```
 
 ---
 
@@ -52,7 +274,9 @@ dungeonAgents-ProveAI/
 │   ├── dungeon_agents_v3.pdf       # Original assignment specification
 │   ├── GEMINI_DP.pdf               # Gemini Deep Research architectural report
 │   ├── GROUND_TRUTH.md             # Extracted hard requirements & deliverables
-│   └── project_logs.md             # Workflow phases & process log
+│   ├── project_logs.md             # Workflow phases & process log
+│   ├── PRD.md                      # Product Requirements Document
+│   └── repo_arch.md                # Canonical file architecture reference (with env docs)
 │
 ├── apps/
 │   │
@@ -66,6 +290,7 @@ dungeonAgents-ProveAI/
 │   │   │   └── orchestrator.py     # Environment Orchestrator / Dungeon Master logic
 │   │   │
 │   │   ├── agents/                 # LLM agent definitions
+│   │   │   ├── llm_factory.py      # Provider-agnostic LLM factory (OpenAI & Gemini)
 │   │   │   ├── agent_a.py          # Agent A — LangGraph node definition
 │   │   │   ├── agent_b.py          # Agent B — LangGraph node definition
 │   │   │   ├── dungeon_master.py   # DM agent — operates on stale state (N-2 turns)
