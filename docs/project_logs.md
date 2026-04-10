@@ -1,6 +1,8 @@
 # Project Workflow
 
 **Start Time: 10:52 AM**
+
+**End Time: 2:35 PM** (Untested Ver) **[Time Elapsed: 3:35]**
 ### Phase 1: Analysis & Requirements Discovery
 * **Initial Review:** Perform a comprehensive read-through of the primary specification: `dungeon_agents_v3.pdf`.
 * **Requirement Extraction:** Utilize Gemini to extrapolate the absolute "Ground Truths," including deliverable specifications, MVP definitions, and hard technical requirements.
