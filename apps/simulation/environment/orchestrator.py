@@ -250,6 +250,45 @@ class EnvironmentOrchestrator:
 
         return None
 
+    def get_current_world_state(self, run_id: RunID, turn: TurnNumber) -> WorldState:
+        """Return the authoritative world state from the orchestrator's internal tracking.
+
+        Used by the game loop to retrieve the latest world state after each
+        agent turn without reading from the event log.
+
+        Parameters
+        ----------
+        run_id:
+            Unique identifier for the current simulation run.
+        turn:
+            The current turn number to embed in the returned snapshot.
+
+        Returns
+        -------
+        WorldState
+            A fresh immutable snapshot reflecting all mutations applied so far.
+        """
+        return self._grid.to_world_state(
+            run_id=run_id,
+            turn=turn,
+            agent_positions=self._agent_positions,
+            key_held_by=self._key_held_by,
+            door_unlocked=self._door_unlocked,
+        )
+
+    def log_termination(self, event: TerminationEvent) -> None:
+        """Append a :class:`~apps.simulation.schemas.events.TerminationEvent` to the event log.
+
+        Called by the game loop once a terminal state is detected so that the
+        final event is persisted in the same ``.jsonl`` file as all other events.
+
+        Parameters
+        ----------
+        event:
+            The termination event to append.
+        """
+        self._append_event(event)
+
     @staticmethod
     def replay_from_log(event_log_path: Path) -> list[WorldState]:
         """Replay all events from *event_log_path* and return world-state snapshots.

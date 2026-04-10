@@ -29,13 +29,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
-from apps.simulation.schemas.events import IntentionEvent, OutcomeEvent
+if TYPE_CHECKING:
+    from apps.simulation.game_loop.message_queue import MessageQueue
+
+from apps.simulation.schemas.events import IntentionEvent, MessageEvent, OutcomeEvent
 from apps.simulation.schemas.state import WorldState
+from packages.shared.constants import COMM_LAG_TURNS
 from packages.shared.types import AgentID, Direction, RunID, TurnNumber
 
 # Key used in ``RunnableConfig["configurable"]`` to inject the tool context.
@@ -111,6 +115,7 @@ class ToolContext:
     llm_completion_tokens: int = 0
     latency_ms: float = 0.0
     raw_llm_output: str = ""
+    message_queue: MessageQueue | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -209,4 +214,19 @@ def communicate(recipient: AgentID, message: str, config: RunnableConfig) -> str
         ctx, "communicate", {"recipient": recipient, "message": message}
     )
     outcome = ctx.orchestrator.apply_intention(intention, ctx.world_state)
+
+    # Enqueue the MessageEvent so the game loop delivers it on the correct turn.
+    if outcome.success and ctx.message_queue is not None:
+        msg_event = MessageEvent(
+            event_type="message",
+            run_id=ctx.run_id,
+            turn_sent=ctx.turn,
+            turn_delivered=TurnNumber(int(ctx.turn) + COMM_LAG_TURNS),
+            sender=ctx.agent_id,
+            recipient=recipient,
+            content=message,
+            timestamp=datetime.now(tz=timezone.utc),
+        )
+        ctx.message_queue.enqueue(msg_event)
+
     return outcome.result_description
