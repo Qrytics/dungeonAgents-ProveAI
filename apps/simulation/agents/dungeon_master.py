@@ -13,11 +13,12 @@ from __future__ import annotations
 import logging
 import time
 
-from langchain_openai import ChatOpenAI
+from langchain_core.language_models.chat_models import BaseChatModel
 from langfuse import Langfuse
 
 logger = logging.getLogger(__name__)
 
+from apps.simulation.agents.llm_factory import build_llm, get_model_identifier
 from apps.simulation.environment.orchestrator import EnvironmentOrchestrator
 from apps.simulation.schemas.state import WorldState
 from packages.shared.types import CellType, RunID, TurnNumber
@@ -71,12 +72,12 @@ class DungeonMasterAgent:
         run_id: RunID,
         langfuse_client: Langfuse,
         llm_model: str = "gpt-4o-mini",
-        llm: ChatOpenAI | None = None,
+        llm: BaseChatModel | None = None,
     ) -> None:
         self._orchestrator = orchestrator
         self._run_id = run_id
         self._langfuse = langfuse_client
-        self._llm = llm if llm is not None else ChatOpenAI(model=llm_model, temperature=0.7)
+        self._llm = llm if llm is not None else build_llm(llm_model, temperature=0.7)
 
     # ------------------------------------------------------------------
     # Public API
@@ -200,7 +201,7 @@ class DungeonMasterAgent:
         )
         trace.generation(
             name="dm_narration",
-            model=self._llm.model_name,
+            model=get_model_identifier(self._llm),
             input=f"DM narration request: current_turn={current_turn}, stale_turn={stale_turn}",
             output=annotation,
             usage={

@@ -3,6 +3,73 @@
 > Source: `README.md` — File Architecture section.
 > This file is the canonical reference for the folder and file layout of this monorepo.
 
+---
+
+## Environment Variables
+
+All runtime secrets are read from environment variables (never hard-coded).
+Copy `.env.example` to `.env` and fill in the values relevant to your chosen LLM provider.
+
+| Variable | Required | Description |
+|---|---|---|
+| `GOOGLE_API_KEY` | Gemini only | Google AI Studio API key. Get it at https://aistudio.google.com/app/apikey |
+| `OPENAI_API_KEY` | OpenAI only | OpenAI platform API key. Get it at https://platform.openai.com/api-keys |
+| `AGENT_LLM_MODEL` | Yes | LLM model name — drives provider selection (see below) |
+| `LANGFUSE_PUBLIC_KEY` | Yes | Langfuse project public key |
+| `LANGFUSE_SECRET_KEY` | Yes | Langfuse project secret key |
+| `LANGFUSE_HOST` | Yes | Langfuse host (default: `https://cloud.langfuse.com`) |
+
+### Setting `GOOGLE_API_KEY` — platform-specific examples
+
+**Bash / macOS / Linux:**
+```bash
+export GOOGLE_API_KEY="your_key_here"
+export AGENT_LLM_MODEL="gemini-2.0-flash"
+```
+
+**Windows PowerShell:**
+```powershell
+$env:GOOGLE_API_KEY = "your_key_here"
+$env:AGENT_LLM_MODEL = "gemini-2.0-flash"
+```
+
+**`.env` file (loaded automatically at startup):**
+```
+GOOGLE_API_KEY=your_key_here
+AGENT_LLM_MODEL=gemini-2.0-flash
+```
+
+---
+
+## LLM Provider Selection
+
+The `AGENT_LLM_MODEL` environment variable controls which LLM provider is used
+for all three agents (Agent A, Agent B, Dungeon Master).  The selection logic
+lives in `apps/simulation/agents/llm_factory.py`:
+
+| Model name prefix | Provider class | Required key |
+|---|---|---|
+| `gemini-*` | `ChatGoogleGenerativeAI` | `GOOGLE_API_KEY` |
+| anything else | `ChatOpenAI` | `OPENAI_API_KEY` |
+
+**Recommended Gemini models:**
+
+| Model | Notes |
+|---|---|
+| `gemini-2.0-flash` | Fast, low-cost — recommended for development |
+| `gemini-1.5-pro` | Higher capability |
+
+**Recommended OpenAI models:**
+
+| Model | Notes |
+|---|---|
+| `gpt-4o-mini` | Default — fast and low-cost |
+| `gpt-4o` | Higher capability |
+
+---
+
+## File Layout
+
 ```
 dungeonAgents-ProveAI/
 │
@@ -28,6 +95,7 @@ dungeonAgents-ProveAI/
 │   │   │   └── orchestrator.py     # Environment Orchestrator / Dungeon Master logic
 │   │   │
 │   │   ├── agents/                 # LLM agent definitions
+│   │   │   ├── llm_factory.py      # Provider-agnostic LLM factory (OpenAI & Gemini)
 │   │   │   ├── agent_a.py          # Agent A — LangGraph node definition
 │   │   │   ├── agent_b.py          # Agent B — LangGraph node definition
 │   │   │   ├── dungeon_master.py   # DM agent — operates on stale state (N-2 turns)
@@ -105,6 +173,7 @@ dungeonAgents-ProveAI/
 | `apps/simulation/environment/perception.py` | M-04 | Fog-of-war engine |
 | `apps/simulation/environment/interaction.py` | M-05 | Action validation |
 | `apps/simulation/environment/orchestrator.py` | M-06 | Event application & replay |
+| `apps/simulation/agents/llm_factory.py` | M-07 | LLM provider factory (OpenAI & Gemini) |
 | `apps/simulation/agents/tools.py` | M-07 | LangGraph tool definitions |
 | `apps/simulation/agents/state.py` | M-08 | Agent belief state manager |
 | `apps/simulation/agents/agent_a.py` | M-09 | Agent A LangGraph node |
