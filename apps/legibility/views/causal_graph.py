@@ -137,10 +137,6 @@ def _build_dag(report: CausalIncidentReport, event_log_path: Path) -> Network:
 
             prev_node = out_node
 
-        # If no chained prev_node reached termination, link from last out to termination
-        if prev_node is not None and prev_node != f"out_{agent_id}_{sorted(spike_turns)[-1]}":
-            _add_edge(prev_node, term_node, label="causes")
-
     # Fallback: if no spike turns at all, add a direct summary → termination edge
     if not any(report.root_cause_turns.values()):
         cause_node = "cause_summary"

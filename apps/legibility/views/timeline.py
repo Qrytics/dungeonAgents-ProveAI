@@ -121,7 +121,7 @@ def render_timeline(event_log_path: Path) -> None:
         hover: list[str] = []
         for bar in bucket_bars:
             x_vals.append(bar["turn"])
-            y_vals.append(float(y_map.get(bar["agent"], 0)))  # type: ignore[arg-type]
+            y_vals.append(float(y_map.get(bar["agent"], 0)))
             hover.append(
                 f"Agent: {bar['agent']}<br>Turn: {bar['turn']}<br>"
                 f"Tool: {bar['tool']}<br>Success: {bar['success']}"
@@ -161,7 +161,7 @@ def render_timeline(event_log_path: Path) -> None:
             gridcolor=_GRID_COLOR,
             zeroline=False,
             tickvals=list(y_map.values()),
-            ticktext=[_AGENT_LABELS.get(a, a) for a in y_map],  # type: ignore[arg-type]
+            ticktext=[_AGENT_LABELS.get(a, a) for a in y_map],
         ),
         paper_bgcolor=_BG_PAPER,
         plot_bgcolor=_BG_PLOT,

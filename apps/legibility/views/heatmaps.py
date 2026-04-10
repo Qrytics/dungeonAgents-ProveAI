@@ -131,7 +131,7 @@ def render_heatmaps(
     col_agent, col_turn = st.columns([1, 2])
     with col_agent:
         agent_ids: list[AgentID] = ["agent_a", "agent_b"]
-        agent: AgentID = st.selectbox(  # type: ignore[assignment]
+        agent: AgentID = st.selectbox(
             "Agent:",
             options=agent_ids,
             index=agent_ids.index(selected_agent) if selected_agent in agent_ids else 0,

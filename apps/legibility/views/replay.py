@@ -200,7 +200,7 @@ def render_replay(event_log_path: Path, selected_turn: int) -> None:
     n_cols = len(current_world.grid[0]) if n_rows else 0
 
     agent_ids: list[AgentID] = ["agent_a", "agent_b"]
-    selected_agent: AgentID = st.selectbox(  # type: ignore[assignment]
+    selected_agent: AgentID = st.selectbox(
         "Belief perspective:",
         options=agent_ids,
         format_func=lambda a: a.replace("_", " ").title(),
