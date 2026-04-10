@@ -15,6 +15,9 @@ from packages.shared.types import AgentID, RunID, TerminationReason, TurnNumber
 
 _event_adapter: TypeAdapter[AnyEvent] = TypeAdapter(AnyEvent)
 
+# Lower temperature for more deterministic, fact-grounded report generation.
+_LLM_TEMPERATURE = 0.2
+
 
 class CausalIncidentReport(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -71,11 +74,17 @@ def _call_llm(prompt: str) -> str:
         raise ImportError("openai package is required for generate_report()") from exc
 
     client = OpenAI()
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        raise EnvironmentError(
+            "OPENAI_API_KEY environment variable is not set. "
+            "Set it before calling generate_report()."
+        )
     model = os.environ.get("AGENT_LLM_MODEL", "gpt-4o-mini")
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.2,
+        temperature=_LLM_TEMPERATURE,
     )
     return response.choices[0].message.content or ""
 
@@ -87,7 +96,6 @@ def _generate_natural_language(
 ) -> tuple[str, str, list[str]]:
     """Use the LLM to produce summary, root_cause_explanation, and recommendations."""
     timeline_text = "\n".join(timeline) if timeline else "(no events recorded)"
-
     spike_lines = []
     for agent_id, turns in root_cause_turns.items():
         if turns:
@@ -95,7 +103,7 @@ def _generate_natural_language(
     spikes_text = "\n".join(spike_lines) if spike_lines else "  (no divergence spikes detected)"
 
     prompt = (
-        "You are an AI assistant analysing a failed dungeon simulation run.\n\n"
+        "You are an AI assistant analyzing a failed dungeon simulation run.\n\n"
         f"Run ID: {termination_event.run_id}\n"
         f"Termination reason: {termination_event.reason}\n"
         f"Final turn: {termination_event.final_turn}\n\n"
