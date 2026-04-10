@@ -12,6 +12,7 @@ from langfuse import Langfuse
 from opentelemetry import trace
 
 from apps.simulation.agents.tools import OrchestratorProtocol
+from apps.simulation.game_loop.message_queue import MessageQueue
 from apps.simulation.schemas.state import AgentPerception, WorldState
 from packages.shared.types import RunID, TurnNumber
 
@@ -44,6 +45,11 @@ class LangGraphState(TypedDict):
         to update its belief state.
     perception_b:
         Latest ``AgentPerception`` snapshot for Agent B (same semantics).
+    message_queue:
+        Shared :class:`~apps.simulation.game_loop.message_queue.MessageQueue`
+        instance.  Passed to each agent's ``ToolContext`` so that the
+        ``communicate`` tool can enqueue messages with the correct
+        communication lag.
     tracer:
         OpenTelemetry ``Tracer`` instance for the current run.
     langfuse_client:
@@ -58,6 +64,7 @@ class LangGraphState(TypedDict):
     belief_manager_b: AgentBeliefStateManager
     perception_a: AgentPerception | None
     perception_b: AgentPerception | None
+    message_queue: MessageQueue
     tracer: trace.Tracer
     langfuse_client: Langfuse
 

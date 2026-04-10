@@ -157,6 +157,7 @@ def agent_b_node(state: LangGraphState) -> LangGraphState:
             llm_completion_tokens=completion_tokens,
             latency_ms=latency_ms,
             raw_llm_output=raw_output,
+            message_queue=state.get("message_queue"),
         )
         config = {"configurable": {TOOL_CONTEXT_KEY: tool_context}}
         tool_fn = _TOOL_FN_MAP.get(tool_name, observe)
