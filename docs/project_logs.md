@@ -1,10 +1,18 @@
-# Project Workflow
+# Project Logs
+
+## Timings
 
 **Start Time: 10:52 AM**
 
 **End Time: 2:35 PM** (Untested Ver) **[Time Elapsed: 3:35]**
 
 **Test Time: 3:04 PM** 
+
+**Final Time: 3:47 PM** (Still Bug Riddled) **[Time Elapsed: 4:55]**
+
+**Separate Timer (Showered & Ate in between):** 4 Hours, 21 Minutes Elapsed
+
+## Project Workflow
 
 ### Phase 1: Analysis & Requirements Discovery
 * **Initial Review:** Perform a comprehensive read-through of the primary specification: `dungeon_agents_v3.pdf`.
