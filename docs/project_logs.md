@@ -3,6 +3,9 @@
 **Start Time: 10:52 AM**
 
 **End Time: 2:35 PM** (Untested Ver) **[Time Elapsed: 3:35]**
+
+**Test Time: 3:04 PM** 
+
 ### Phase 1: Analysis & Requirements Discovery
 * **Initial Review:** Perform a comprehensive read-through of the primary specification: `dungeon_agents_v3.pdf`.
 * **Requirement Extraction:** Utilize Gemini to extrapolate the absolute "Ground Truths," including deliverable specifications, MVP definitions, and hard technical requirements.
@@ -28,3 +31,19 @@
 * **Workstream C: Legibility Layer (Dashboard)**
     * Setting up the Streamlit interface to visualize the runs.jsonl output in real-time.
     * Integrating Langfuse trackers to monitor token consumption and "Epistemic Divergence."
+
+### Phase 5: Running & Testing
+* **Environment Validation:** Verify Python 3.12+ environment and Langfuse connectivity using the `auth_check()` script.
+* **Execution:** Run the primary simulation using the module runner:
+    ```bash
+    python -m apps.simulation.main --verbose
+    ```
+* **Trace Verification:** Confirm that traces are appearing in the [Langfuse Dashboard](https://us.cloud.langfuse.com/project/cmnt97hcb00dcad07fvxigbwo/traces) with correct spans for Perception, Reasoning, and Action.
+* **Automated Testing:** Execute the suite to ensure modular integrity:
+    ```bash
+    pytest
+    ```
+* **Legibility Check:** Launch the Streamlit dashboard to visualize the `runs.jsonl` data:
+    ```bash
+    streamlit run apps/legibility/app.py
+    ```
