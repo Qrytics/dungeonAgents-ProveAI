@@ -1,7 +1,7 @@
 """M-11 — Game Loop.
 
 Implements the turn-based execution engine that drives the dungeon simulation.
-Each turn follows a strict ordering: perception, message delivery, Agent A,
+Each turn follows a strict ordering: message delivery, perception, Agent A,
 Agent B, Dungeon Master narration, termination check.
 """
 
@@ -72,7 +72,7 @@ class GameConfig:
 class GameLoop:
     """Turn-based execution engine for the dungeon simulation.
 
-    Initialises all simulation components from a :class:`GameConfig` and
+    Initializes all simulation components from a :class:`GameConfig` and
     drives the game to completion via :meth:`run`.  The loop enforces strict
     turn ordering, communication lag, and termination conditions.
 
