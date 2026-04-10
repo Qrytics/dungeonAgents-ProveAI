@@ -28,8 +28,8 @@ from apps.simulation.schemas.state import WorldState
 from packages.shared.constants import TURN_LIMIT
 from packages.shared.types import AgentID, Direction, Position, TurnNumber
 
-# Number of consecutive no-move turns before "stuck" termination is declared.
-_STUCK_TURN_THRESHOLD: int = 3
+# Number of consecutive turns with no successful action before "stuck" is declared.
+_STUCK_TURN_THRESHOLD: int = 10
 
 # Singleton type adapter for deserialising AnyEvent from JSON.
 _EVENT_ADAPTER: TypeAdapter[AnyEvent] = TypeAdapter(AnyEvent)
@@ -57,9 +57,9 @@ class EnvironmentOrchestrator:
         self._key_held_by: AgentID | None = None
         self._door_unlocked: bool = False
 
-        # Stuck detection: turn number of the last successful move action.
-        # None means no move has succeeded yet.
-        self._last_successful_move_turn: TurnNumber | None = None
+        # Stuck detection: turn number of the last successful action of any kind.
+        # None means no action has succeeded yet.
+        self._last_successful_action_turn: TurnNumber | None = None
 
         # Ensure the event log directory exists.
         event_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -110,7 +110,6 @@ class EnvironmentOrchestrator:
             result_description = reason
             if is_valid and new_pos is not None:
                 self._agent_positions[agent_id] = new_pos
-                self._last_successful_move_turn = turn
 
         elif tool == "interact":
             current_pos = self._agent_positions[agent_id]
@@ -145,6 +144,10 @@ class EnvironmentOrchestrator:
         else:
             success = False
             result_description = f"Unknown tool '{tool}' for agent {agent_id}."
+
+        # Any successful action counts as progress for stuck detection.
+        if success:
+            self._last_successful_action_turn = turn
 
         # Build the updated world state.
         world_state_after = self._grid.to_world_state(
@@ -194,7 +197,7 @@ class EnvironmentOrchestrator:
             ``reason="turn_limit"`` — *turn* has reached or exceeded
             :data:`~packages.shared.constants.TURN_LIMIT`.
 
-            ``reason="stuck"`` — no agent successfully moved in the last
+            ``reason="stuck"`` — no agent took any successful action in the last
             :data:`_STUCK_TURN_THRESHOLD` consecutive turns.
         None
             The game continues.
@@ -325,12 +328,12 @@ class EnvironmentOrchestrator:
     # ------------------------------------------------------------------
 
     def _is_stuck(self, turn: int) -> bool:
-        """Return True if no agent has moved successfully for the last
+        """Return True if no agent has taken any successful action for the last
         ``_STUCK_TURN_THRESHOLD`` consecutive turns."""
-        if self._last_successful_move_turn is None:
-            # No successful move has ever occurred.
+        if self._last_successful_action_turn is None:
+            # No successful action has ever occurred.
             return turn >= _STUCK_TURN_THRESHOLD
-        return turn - int(self._last_successful_move_turn) >= _STUCK_TURN_THRESHOLD
+        return turn - int(self._last_successful_action_turn) >= _STUCK_TURN_THRESHOLD
 
     def _append_event(
         self,

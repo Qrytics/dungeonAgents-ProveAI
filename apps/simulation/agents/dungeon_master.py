@@ -189,28 +189,31 @@ class DungeonMasterAgent:
         latency_ms: float,
     ) -> None:
         """Log a DM annotation to Langfuse as trace metadata."""
-        trace = self._langfuse.trace(
+        with self._langfuse.start_as_current_observation(
             name="dungeon_master_annotation",
-            session_id=self._run_id,
+            as_type="span",
             metadata={
                 "run_id": self._run_id,
+                "session_id": self._run_id,
                 "current_turn": int(current_turn),
                 "stale_turn": int(stale_turn),
                 "staleness_turns": DM_STALENESS,
             },
-        )
-        trace.generation(
-            name="dm_narration",
-            model=get_model_identifier(self._llm),
-            input=f"DM narration request: current_turn={current_turn}, stale_turn={stale_turn}",
-            output=annotation,
-            usage={
-                "input": prompt_tokens,
-                "output": completion_tokens,
-                "total": prompt_tokens + completion_tokens,
-            },
-            metadata={
-                "latency_ms": latency_ms,
-                "agent_id": "dungeon_master",
-            },
-        )
+        ):
+            with self._langfuse.start_as_current_observation(
+                name="dm_narration",
+                as_type="generation",
+                model=get_model_identifier(self._llm),
+                input=f"DM narration request: current_turn={current_turn}, stale_turn={stale_turn}",
+                output=annotation,
+                usage_details={
+                    "input": prompt_tokens,
+                    "output": completion_tokens,
+                    "total": prompt_tokens + completion_tokens,
+                },
+                metadata={
+                    "latency_ms": latency_ms,
+                    "agent_id": "dungeon_master",
+                },
+            ):
+                pass

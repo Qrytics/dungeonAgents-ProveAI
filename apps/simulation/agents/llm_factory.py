@@ -3,14 +3,14 @@
 Provides :func:`build_llm` which returns an appropriate LangChain chat model
 based on the model name string:
 
-* Model names that start with ``"gemini-"`` → Google provider, chosen automatically:
+* Model names that start with ``"gemini-"`` → :class:`~langchain_google_genai.ChatGoogleGenerativeAI`,
+  chosen automatically:
 
   - If ``GOOGLE_APPLICATION_CREDENTIALS`` is set (service-account JSON path),
-    :class:`~langchain_google_vertexai.ChatVertexAI` is used (Vertex AI).
+    Vertex AI mode is used (``vertexai=True``).
     You must also set ``VERTEXAI_PROJECT`` and ``VERTEXAI_LOCATION``
     (e.g. ``us-central1``).
-  - Otherwise :class:`~langchain_google_genai.ChatGoogleGenerativeAI` is used
-    (Gemini API; requires ``GOOGLE_API_KEY``).
+  - Otherwise the public Gemini API is used (requires ``GOOGLE_API_KEY``).
 
 * All other model names → :class:`~langchain_openai.ChatOpenAI`
   (reads ``OPENAI_API_KEY`` from the environment).
@@ -68,18 +68,6 @@ def build_llm(model_name: str, **kwargs) -> BaseChatModel:
         ImportError: If the required provider package is not installed.
     """
     if model_name.startswith("gemini-"):
-        if _resolve_gemini_provider() == "vertex_ai":
-            try:
-                from langchain_google_vertexai import ChatVertexAI  # type: ignore[import]
-            except ImportError as exc:
-                raise ImportError(
-                    "Vertex AI models require 'langchain-google-vertexai'. "
-                    "Install it with:  pip install langchain-google-vertexai"
-                ) from exc
-            project = os.environ.get("VERTEXAI_PROJECT")
-            location = os.environ.get("VERTEXAI_LOCATION", "us-central1")
-            return ChatVertexAI(model_name=model_name, project=project, location=location, **kwargs)
-
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI  # type: ignore[import]
         except ImportError as exc:
@@ -87,6 +75,12 @@ def build_llm(model_name: str, **kwargs) -> BaseChatModel:
                 "Gemini models require 'langchain-google-genai'. "
                 "Install it with:  pip install langchain-google-genai"
             ) from exc
+        if _resolve_gemini_provider() == "vertex_ai":
+            project = os.environ.get("VERTEXAI_PROJECT")
+            location = os.environ.get("VERTEXAI_LOCATION", "us-central1")
+            return ChatGoogleGenerativeAI(
+                model=model_name, vertexai=True, project=project, location=location, **kwargs
+            )
         return ChatGoogleGenerativeAI(model=model_name, **kwargs)
 
     from langchain_openai import ChatOpenAI

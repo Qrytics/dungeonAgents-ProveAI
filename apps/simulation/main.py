@@ -30,8 +30,13 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 import uuid
+
+from dotenv import load_dotenv
+
+load_dotenv()
 from pathlib import Path
 
 from apps.simulation.game_loop.loop import GameConfig, GameLoop
@@ -68,9 +73,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model",
         type=str,
-        default="gpt-4o-mini",
+        default=os.environ.get("AGENT_LLM_MODEL", "gpt-4o-mini"),
         metavar="TEXT",
-        help="LLM model name (default: gpt-4o-mini)",
+        help="LLM model name (default: gpt-4o-mini, or AGENT_LLM_MODEL env var)",
     )
     parser.add_argument(
         "--runs-dir",
@@ -117,9 +122,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.cols < GRID_MIN_SIZE:
         parser.error(f"--cols must be >= {GRID_MIN_SIZE} (got {args.cols})")
 
-    # Configure logging: verbose → INFO, otherwise WARNING.
+    # Configure logging: always WARNING for third-party noise; verbose output
+    # is handled separately via GameConfig.verbose / print().
     logging.basicConfig(
-        level=logging.INFO if args.verbose else logging.WARNING,
+        level=logging.WARNING,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         stream=sys.stdout,
     )
@@ -137,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         seed=args.seed,
         llm_model=args.model,
         event_log_dir=runs_dir,
+        verbose=args.verbose,
     )
 
     loop = GameLoop(config)

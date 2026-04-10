@@ -69,15 +69,20 @@ def init_tracer(run_id: RunID) -> tuple[trace.Tracer, Langfuse]:
     resource = Resource.create({"service.name": service_name, "run_id": run_id})
     provider = TracerProvider(resource=resource)
 
-    otlp_exporter = OTLPSpanExporter(endpoint=exporter_endpoint)
-    processor = BatchSpanProcessor(
-        otlp_exporter,
-        max_export_batch_size=batch_size,
-        # schedule_delay_millis controls how often the batch is flushed
-        # (export_interval_ms in otel.yaml).
-        schedule_delay_millis=export_interval_ms,
-    )
-    provider.add_span_processor(processor)
+    # Only attach the OTLP exporter when the endpoint is explicitly overridden
+    # via the environment, or the otel.yaml points to a non-localhost collector.
+    # This avoids noisy connection-refused errors when no local collector runs.
+    _otlp_endpoint: str = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", exporter_endpoint)
+    _is_localhost = "localhost" in _otlp_endpoint or "127.0.0.1" in _otlp_endpoint
+    _otlp_explicitly_set = "OTEL_EXPORTER_OTLP_ENDPOINT" in os.environ
+    if not _is_localhost or _otlp_explicitly_set:
+        otlp_exporter = OTLPSpanExporter(endpoint=_otlp_endpoint)
+        processor = BatchSpanProcessor(
+            otlp_exporter,
+            max_export_batch_size=batch_size,
+            schedule_delay_millis=export_interval_ms,
+        )
+        provider.add_span_processor(processor)
 
     # Set as the global provider so opentelemetry.trace.get_tracer() also
     # returns spans from this provider.

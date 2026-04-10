@@ -29,6 +29,8 @@ class AgentBeliefStateManager:
         self._current_turn: TurnNumber = TurnNumber(0)
         self._pending_messages: tuple[str, ...] = ()
         self._current_belief: AgentBeliefState | None = None
+        # Rolling history of (turn, tool_name, result) for the last 3 actions.
+        self._recent_actions: list[tuple[int, str, str]] = []
 
     # ------------------------------------------------------------------
     # Public API
@@ -81,6 +83,18 @@ class AgentBeliefStateManager:
             )
         return self._current_belief
 
+    def record_action(self, turn: int, tool_name: str, result: str) -> None:
+        """Record the result of a completed tool call for inclusion in future prompts."""
+        self._recent_actions.append((turn, tool_name, result))
+        if len(self._recent_actions) > 3:
+            self._recent_actions.pop(0)
+
+    def last_action_tool_name(self) -> str | None:
+        """Return the most recent tool name, or None when no action is recorded."""
+        if not self._recent_actions:
+            return None
+        return self._recent_actions[-1][1]
+
     def to_llm_prompt_context(self) -> str:
         """Format the belief state as a deterministic human-readable string for LLM injection.
 
@@ -94,6 +108,14 @@ class AgentBeliefStateManager:
             f"Current Position: row={belief.believed_position[0]}, col={belief.believed_position[1]}",
             f"Carrying Key: {'Yes' if belief.has_key else 'No'}",
         ]
+
+        # Recent action history so the LLM knows what it already tried.
+        if self._recent_actions:
+            lines.append("Your recent actions (oldest first):")
+            for t, tname, res in self._recent_actions:
+                lines.append(f"  Turn {t}: {tname} → {res}")
+        else:
+            lines.append("Your recent actions: none yet — this is your first turn.")
 
         # Known agent positions — sorted by agent_id for determinism.
         if belief.known_agent_positions:

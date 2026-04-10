@@ -186,8 +186,35 @@ def observe(config: RunnableConfig) -> str:
     """
     ctx = _get_context(config)
     intention = _make_intention(ctx, "observe", {})
-    outcome = ctx.orchestrator.apply_intention(intention, ctx.world_state)
-    return outcome.result_description
+    ctx.orchestrator.apply_intention(intention, ctx.world_state)
+
+    # Build a human-readable description of adjacent cells.
+    pos = ctx.world_state.agent_positions.get(ctx.agent_id)
+    if pos is None:
+        return "Could not determine current position."
+
+    _SYMBOLS: dict[str, str] = {
+        "floor": "floor", "wall": "WALL", "key": "KEY(!)", "locked_door": "LOCKED_DOOR",
+        "exit": "EXIT(!)", "agent": "other-agent",
+    }
+    row, col = pos
+    directions = {
+        "north": (row - 1, col), "south": (row + 1, col),
+        "east": (row, col + 1), "west": (row, col - 1),
+    }
+    grid = ctx.world_state.grid
+    rows_count = len(grid)
+    cols_count = len(grid[0]) if rows_count else 0
+
+    cell_lines = [f"You are at row={row}, col={col}. Adjacent cells:"]
+    for direction, (nr, nc) in directions.items():
+        if 0 <= nr < rows_count and 0 <= nc < cols_count:
+            cell_type = grid[nr][nc].cell_type
+            label = _SYMBOLS.get(cell_type, cell_type)
+            cell_lines.append(f"  {direction}: ({nr},{nc}) = {label}")
+        else:
+            cell_lines.append(f"  {direction}: out of bounds (WALL)")
+    return "\n".join(cell_lines)
 
 
 @tool

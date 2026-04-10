@@ -62,6 +62,7 @@ class GameConfig:
     seed: int | None = None
     llm_model: str = "gpt-4o-mini"
     event_log_dir: Path = field(default_factory=lambda: RUNS_DIR)
+    verbose: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -209,15 +210,37 @@ class GameLoop:
             # Step 7 — DM narrates the stale state.
             # ----------------------------------------------------------
             stale_idx = len(self._world_state_history) - 1 - DM_STALENESS
+            dm_annotation: str | None = None
             if stale_idx >= 0:
                 stale_state = self._world_state_history[stale_idx]
                 try:
-                    self._dm.act(stale_state, turn)
+                    dm_annotation = self._dm.act(stale_state, turn)
                 except Exception:  # noqa: BLE001 — DM errors must not stop the loop
                     logger.exception(
                         "DungeonMasterAgent raised unexpectedly on turn %d; continuing.",
                         int(turn),
                     )
+
+            # ----------------------------------------------------------
+            # Verbose console output.
+            # ----------------------------------------------------------
+            if self._config.verbose:
+                pos_a = world_state.agent_positions.get("agent_a", "?")
+                pos_b = world_state.agent_positions.get("agent_b", "?")
+                key_status = (
+                    f"held by {world_state.key_held_by}"
+                    if world_state.key_held_by
+                    else "floor"
+                )
+                door_status = "unlocked" if world_state.door_unlocked else "locked"
+                print(
+                    f"\n── Turn {int(turn)} "
+                    + "─" * 40
+                    + f"\n  Agent A: {pos_a}  Agent B: {pos_b}"
+                    f"  |  Key: {key_status}  |  Door: {door_status}"
+                )
+                if dm_annotation:
+                    print(f"  DM: {dm_annotation}")
 
             # ----------------------------------------------------------
             # Step 8 — Check termination conditions.

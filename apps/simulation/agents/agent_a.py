@@ -39,7 +39,7 @@ from apps.simulation.agents.tools import (
     observe,
 )
 from packages.observability.spans import action_span, perception_span, reasoning_span
-from packages.shared.types import ToolName
+from packages.shared.types import Direction, ToolName
 
 from . import LangGraphState
 
@@ -59,6 +59,54 @@ _TOOL_FN_MAP = {
     "communicate": communicate,
 }
 
+
+def _fallback_move_direction(belief_manager: AgentBeliefStateManager, turn: int) -> Direction:
+    """Pick a deterministic move direction from known adjacent walkable cells.
+
+    This prevents deadlocks when the model repeatedly selects `observe`.
+    """
+    belief = belief_manager.get_current_belief()
+    row, col = belief.believed_position
+
+    # Prefer objective cells first when known nearby.
+    candidates: list[tuple[Direction, tuple[int, int]]] = [
+        ("north", (row - 1, col)),
+        ("east", (row, col + 1)),
+        ("south", (row + 1, col)),
+        ("west", (row, col - 1)),
+    ]
+    for direction, pos in candidates:
+        ctype = belief.believed_grid.get(pos)
+        if ctype in ("key", "exit"):
+            return direction
+    for direction, pos in candidates:
+        ctype = belief.believed_grid.get(pos)
+        if ctype == "floor":
+            return direction
+
+    # If everything is unknown, rotate deterministically by turn.
+    cycle: list[Direction] = ["north", "east", "south", "west"]
+    return cycle[turn % len(cycle)]
+
+
+def _should_force_interact(belief_manager: AgentBeliefStateManager) -> bool:
+    """Return True when interaction should be forced from local belief state."""
+    belief = belief_manager.get_current_belief()
+    row, col = belief.believed_position
+    here = belief.believed_grid.get((row, col))
+
+    # Standing on key and not carrying it yet.
+    if here == "key" and not belief.has_key:
+        return True
+
+    # Carrying key and adjacent to locked door.
+    if belief.has_key:
+        for pos in ((row - 1, col), (row + 1, col), (row, col - 1), (row, col + 1)):
+            if belief.believed_grid.get(pos) == "locked_door":
+                return True
+
+    return False
+
 _SYSTEM_PROMPT = (
     "You are agent_a, an autonomous agent navigating a dungeon grid.\n\n"
     "Objective: Cooperate with agent_b so that BOTH agents reach the exit. "
@@ -74,7 +122,16 @@ _SYSTEM_PROMPT = (
     "- interact(): Pick up the key if on the key cell, or unlock the door "
     "if adjacent and holding the key.\n"
     "- communicate(recipient, message): Send a text message to agent_b "
-    "(delivered next turn).\n"
+    "(delivered next turn).\n\n"
+    "Decision rules — MUST follow:\n"
+    "1. Use observe ONLY on your very first turn OR after a move/interact. NEVER call observe twice in a row.\n"
+    "2. After observing, you MUST call move() or interact() next turn — use the cell info you just got.\n"
+    "3. If KEY(!) appears in your recent observe result or explored map, move toward it immediately.\n"
+    "4. If you are standing on the key cell, call interact() to pick it up.\n"
+    "5. If you hold the key and LOCKED_DOOR is adjacent, call interact() to unlock it.\n"
+    "6. Once the door is unlocked, move toward EXIT(!).\n"
+    "7. When no objective is visible, move in any floor direction — DO NOT stay still.\n"
+    "8. If a move fails (wall), try a different direction immediately.\n"
 )
 
 
@@ -110,7 +167,7 @@ def agent_a_node(state: LangGraphState) -> LangGraphState:
         belief_manager.update_from_perception(perception)
 
     model_name: str = os.environ.get("AGENT_LLM_MODEL", "gpt-4o-mini")
-    llm = build_llm(model_name).bind_tools(_TOOLS, tool_choice="required")
+    llm = build_llm(model_name).bind_tools(_TOOLS, tool_choice="any")
 
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -153,6 +210,16 @@ def agent_a_node(state: LangGraphState) -> LangGraphState:
             tool_name = tool_call["name"]
             tool_args = tool_call.get("args", {})
 
+        # Deterministic safety policy to prevent no-op loops.
+        if _should_force_interact(belief_manager):
+            tool_name = "interact"
+            tool_args = {}
+        elif tool_name in ("observe", "communicate") and (
+            belief_manager.last_action_tool_name() == tool_name
+        ):
+            tool_name = "move"
+            tool_args = {"direction": _fallback_move_direction(belief_manager, int(turn))}
+
         # Build the tool context carrying token-count and latency metadata.
         tool_context = ToolContext(
             agent_id=_AGENT_ID,
@@ -179,5 +246,7 @@ def agent_a_node(state: LangGraphState) -> LangGraphState:
         ) as act_span:
             result = tool_fn.invoke(tool_args, config=config)
             act_span.set_attribute("tool.result", result)
+
+            belief_manager.record_action(int(turn), tool_name, str(result))
 
     return state
