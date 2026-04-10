@@ -47,7 +47,11 @@ class AgentBeliefStateManager:
             # override with the latest observed type (handles key removal, etc.).
             self._believed_grid[pos] = cell.cell_type
 
-            # Infer the other playable agent's position from visible "agent" cells.
+            # Any visible "agent" cell that is not our own position belongs to the
+            # other playable agent.  The game has exactly two playable agents, so
+            # multiple such cells in one perception update are impossible in a valid
+            # game state — but if they appear (e.g. stale grid rendering), the last
+            # observed position is used, which is acceptable.
             if cell.cell_type == "agent" and pos != perception.position:
                 other = self._other_agent_id()
                 if other is not None:
@@ -118,7 +122,7 @@ class AgentBeliefStateManager:
                 row_str = "  "
                 for col in cols:
                     cell_type = belief.believed_grid.get((row, col))
-                    row_str += _CELL_SYMBOLS.get(cell_type, " ") if cell_type is not None else " "
+                    row_str += _CELL_SYMBOLS.get(cell_type, " ")
                 lines.append(row_str)
         else:
             lines.append("Explored Map: No cells observed yet")
@@ -138,7 +142,11 @@ class AgentBeliefStateManager:
     # ------------------------------------------------------------------
 
     def _other_agent_id(self) -> AgentID | None:
-        """Return the ID of the other playable agent, or None for non-playable agents."""
+        """Return the ID of the other playable agent.
+
+        The game has exactly two playable agents (`_PLAYABLE_AGENTS`).  Returns None
+        only if ``self._agent_id`` is not a playable agent (e.g. dungeon_master).
+        """
         for agent_id in _PLAYABLE_AGENTS:
             if agent_id != self._agent_id:
                 return agent_id
