@@ -76,3 +76,58 @@
       ── Turn 4 ────────────────────────────────────────
         Agent A: (1, 1)  Agent B: (3, 4)  |  Key: held by agent_a  |  Door: locked
         DM: Agent A, clutching a key, stands near the entrance, while Agent B navigates the central corridors. The locked door looms, a potential obstacle to their escape.
+
+
+# Full AI Conversation History:
+* make a list of super important things to note about this assignment that must be a part of the final deliverable
+* i want you to make a list of hard rules extrapolated from this document, be as explicit as possible, i'm using it as the source of base truth
+* is it fine now?
+* write this in a neater, list way for md file:...
+* Help me think of what the best, tech stack would be for this sort of project. Also think of the most optimized file architechture for this project's monorepo
+* don't focus so much on the 4-hour dev window, leave that unspecified
+* use the docs in the docs/ folder to create super basic folder scaffolding for the project, be as thorough as possible. Make sure not to write any actual code, just create the folders and files and write a blank comment inside.
+Make sure you document stuff like the file architechture, what this project is and stuff like that in the main README.md file. Remember, you're not writing any code.
+* based on the entire repository structure and the files in the docs/ folder, create a thorough PRD.md file that is super modular and allows for parrallel agents to work on separate tasks topics so that their context isn't wasted. Be very specific and careful with what you write on here for the PRD since we'll be using that to assign tasks.
+Also make a file called repo_arch.md that is basically just filled with the file architecture outlined in the main README.md file.
+* look at docs/PRD.md and implement module 18, configuration & devops
+* .env.example
+Add capability to use Gemini LLMs.
+OPENAI_API_KEY=your_openai_key_here
+AGENT_LLM_MODEL=gpt-4o-mini
+* look at docs/PRD.md and implement module 1, shared types
+* look at docs/PRD.md and implement module 2, pydantic schemas
+* look at docs/PRD.md and implement module 3, environment: grid state machine
+* look at docs/PRD.md and implement module 8, Agent Belief State
+* look at docs/PRD.md and implement module 13, observability package
+* look at docs/PRD.md and implement module 14, legibility: epistemic divergence analysis
+* look at docs/PRD.md and implement module 4, environment: perception & fog-of-war engine
+* look at docs/PRD.md and implement module 5, environment: interaction & action validation
+* look at docs/PRD.md and implement module 21, tests: legibility / divergence
+* look at docs/PRD.md and implement module 15, legibility: causal incident report generator
+* Make sure ai call check supports Gemini LLM call.
+* look at docs/PRD.md and implement module 6, environment: orchestrator (dungeon master logic)
+* look at docs/PRD.md and implement module 7, agent tools
+* look at docs/PRD.md and implement module 9, llm agents: agent A & agent B
+* look at docs/PRD.md and implement module 16, legibility: dashboard views
+* look at docs/PRD.md and implement module 10, llm agents: dungeon master agent
+* look at docs/PRD.md and implement module 19, tests: environment
+* look at docs/PRD.md and implement module 20, tests: agent tools
+* look at docs/PRD.md and implement module 17, legibility: streamlit app entry point
+* look at docs/PRD.md and implement module 11, game loop & message queue
+* look at docs/PRD.md and implement module 12, simulation entry point
+* Make sure everything supports a Gemini api key like this $env:GOOGLE_API_KEY =
+and also make sure you update the file arch doc inside the docs/ folder also update the main README.md file and also be super specific about how to run the actual project. how to run it, how to set it up, how to test it, everything.
+* For another project i had already set up these llm models and keys and stuff, make this project able to use it.
+def _resolve_gemini_model() -> str: """ Choose the LiteLLM model string based on available Google credentials.
+Code
+- If GOOGLE_APPLICATION_CREDENTIALS is set (service account JSON path),
+  use the Vertex AI provider which honours that credential file.
+  You must also set VERTEXAI_PROJECT and VERTEXAI_LOCATION (e.g. us-central1).
+- Otherwise fall back to the Gemini API which requires GOOGLE_API_KEY.
+"""
+if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+    return "vertex_ai/gemini-2.5-flash-lite"
+return "gemini/gemini-2.5-flash-lite"
+GOOGLE_APPLICATION_CREDENTIALS=C:\Users\mario\Downloads\i3-lab-ml-ade9e5c3cbbc.json VERTEXAI_PROJECT=i3-lab-ml VERTEXAI_LOCATION=us-central1
+
+* they're still just not moving, do you think it's because i'm using too crappy agents to test it or is it a wiring issue of some sort?
