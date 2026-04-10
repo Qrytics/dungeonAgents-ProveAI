@@ -33,7 +33,7 @@ def count_cell_type(grid: DungeonGrid, cell_type: CellType) -> int:
 
 
 def test_grid_minimum_size() -> None:
-    """An 8×8 grid is created without errors."""
+    """A grid of minimum size (GRID_MIN_SIZE × GRID_MIN_SIZE) is created without errors."""
     g = DungeonGrid(rows=GRID_MIN_SIZE, cols=GRID_MIN_SIZE, seed=0)
     assert g._rows == GRID_MIN_SIZE
     assert g._cols == GRID_MIN_SIZE

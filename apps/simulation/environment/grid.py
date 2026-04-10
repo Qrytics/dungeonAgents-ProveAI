@@ -9,9 +9,11 @@ from packages.shared.constants import GRID_MIN_SIZE
 from packages.shared.types import AgentID, CellType, Position, RunID, TurnNumber
 
 # Minimum Manhattan distance between agent start positions
-_AGENT_MIN_DISTANCE: int = 3
+_MIN_AGENT_SEPARATION: int = 3
 # Probability that any interior cell starts as a wall
 _INTERIOR_WALL_DENSITY: float = 0.20
+# Minimum interior floor cells needed: key + exit + locked_door + two agent starts
+_MIN_REQUIRED_FLOOR_CELLS: int = 5
 
 
 class DungeonGrid:
@@ -150,7 +152,7 @@ class DungeonGrid:
         # Step 3 — collect passable interior cells for placement
         floor_cells = self._floor_interior_cells()
 
-        if len(floor_cells) < 4:
+        if len(floor_cells) < _MIN_REQUIRED_FLOOR_CELLS:
             # Extremely rare; clear all interior walls and retry placement
             for r in range(1, rows - 1):
                 for c in range(1, cols - 1):
@@ -183,7 +185,7 @@ class DungeonGrid:
         #  • at least AGENT_MIN_DISTANCE apart (Manhattan)
         start_candidates = self._floor_interior_cells()
 
-        a_pos, b_pos = self._pick_two_distant(start_candidates, _AGENT_MIN_DISTANCE)
+        a_pos, b_pos = self._pick_two_distant(start_candidates, _MIN_AGENT_SEPARATION)
         self._agent_starts = {"agent_a": a_pos, "agent_b": b_pos}
 
     def _floor_interior_cells(self) -> list[Position]:
