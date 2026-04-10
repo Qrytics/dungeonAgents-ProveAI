@@ -10,18 +10,18 @@ that the OTel SDK can deduplicate them correctly across calls.
 
 from __future__ import annotations
 
-from opentelemetry.metrics import Meter
+from opentelemetry.metrics import Counter, Histogram, Meter
 
 from packages.shared.types import AgentID, TurnNumber
 
 # ---------------------------------------------------------------------------
 # Lazy instrument cache.  Keys are (meter_id, instrument_name).
 # ---------------------------------------------------------------------------
-_histograms: dict[tuple[int, str], object] = {}
-_counters: dict[tuple[int, str], object] = {}
+_histograms: dict[tuple[int, str], Histogram] = {}
+_counters: dict[tuple[int, str], Counter] = {}
 
 
-def _get_histogram(meter: Meter, name: str, description: str, unit: str) -> object:
+def _get_histogram(meter: Meter, name: str, description: str, unit: str) -> Histogram:
     key = (id(meter), name)
     if key not in _histograms:
         _histograms[key] = meter.create_histogram(
@@ -30,7 +30,7 @@ def _get_histogram(meter: Meter, name: str, description: str, unit: str) -> obje
     return _histograms[key]
 
 
-def _get_counter(meter: Meter, name: str, description: str, unit: str) -> object:
+def _get_counter(meter: Meter, name: str, description: str, unit: str) -> Counter:
     key = (id(meter), name)
     if key not in _counters:
         _counters[key] = meter.create_counter(
@@ -59,7 +59,7 @@ def record_divergence_score(
         description="Epistemic divergence score for an agent turn",
         unit="1",
     )
-    histogram.record(score, attributes={"agent_id": agent_id, "turn": turn})  # type: ignore[attr-defined]
+    histogram.record(score, attributes={"agent_id": agent_id, "turn": turn})
 
 
 def record_token_usage(
@@ -84,7 +84,7 @@ def record_token_usage(
         description="Total prompt tokens used by an agent",
         unit="tokens",
     )
-    prompt_counter.add(prompt_tokens, attributes=attrs)  # type: ignore[attr-defined]
+    prompt_counter.add(prompt_tokens, attributes=attrs)
 
     completion_counter = _get_counter(
         meter,
@@ -92,7 +92,7 @@ def record_token_usage(
         description="Total completion tokens used by an agent",
         unit="tokens",
     )
-    completion_counter.add(completion_tokens, attributes=attrs)  # type: ignore[attr-defined]
+    completion_counter.add(completion_tokens, attributes=attrs)
 
 
 def record_turn_latency(
@@ -115,4 +115,4 @@ def record_turn_latency(
         description="Latency of an agent turn in milliseconds",
         unit="ms",
     )
-    histogram.record(latency_ms, attributes={"agent_id": agent_id, "turn": turn})  # type: ignore[attr-defined]
+    histogram.record(latency_ms, attributes={"agent_id": agent_id, "turn": turn})

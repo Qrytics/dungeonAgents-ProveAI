@@ -73,7 +73,9 @@ def init_tracer(run_id: RunID) -> tuple[trace.Tracer, Langfuse]:
     processor = BatchSpanProcessor(
         otlp_exporter,
         max_export_batch_size=batch_size,
-        export_timeout_millis=export_interval_ms,
+        # schedule_delay_millis controls how often the batch is flushed
+        # (export_interval_ms in otel.yaml).
+        schedule_delay_millis=export_interval_ms,
     )
     provider.add_span_processor(processor)
 
@@ -84,13 +86,13 @@ def init_tracer(run_id: RunID) -> tuple[trace.Tracer, Langfuse]:
     tracer: trace.Tracer = provider.get_tracer(LANGFUSE_PROJECT)
 
     langfuse_cfg = _load_yaml("langfuse.yaml")
-    langfuse_host: str = os.environ.get(
-        "LANGFUSE_HOST",
-        langfuse_cfg.get("host", "https://cloud.langfuse.com"),
-    )
-    # Resolve ${LANGFUSE_HOST} placeholder that may appear in the YAML file.
-    if langfuse_host.startswith("${"):
-        langfuse_host = os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com")
+    # Environment variable always takes precedence.  The YAML value may
+    # contain an unresolved placeholder such as "${LANGFUSE_HOST}", so we
+    # only use it as a fallback when it is a plain URL string.
+    _yaml_host: str = langfuse_cfg.get("host", "")
+    if _yaml_host.startswith("${") or not _yaml_host:
+        _yaml_host = "https://cloud.langfuse.com"
+    langfuse_host: str = os.environ.get("LANGFUSE_HOST", _yaml_host)
 
     langfuse_client = Langfuse(
         public_key=os.environ.get("LANGFUSE_PUBLIC_KEY", ""),
