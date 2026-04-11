@@ -26,6 +26,7 @@ The primary deliverable is **not** agent intelligence — it is the quality of t
 | Observability | Langfuse + OpenTelemetry (OTel) |
 | State & Validation | Pydantic V2 |
 | Legibility UI | Streamlit |
+| Live grid UI | React (Vite) + local HTTP helper for in-progress runs |
 | Event Storage | Immutable `.jsonl` flat files |
 
 ---
@@ -181,12 +182,15 @@ python -m apps.simulation.main --model gemini-2.0-flash
 usage: python -m apps.simulation.main [OPTIONS]
 
 Options:
-  --rows INT      Grid rows (default: 8, min: 8)
-  --cols INT      Grid columns (default: 8, min: 8)
-  --seed INT      Random seed for reproducible layout
-  --model TEXT    LLM model name (default: reads AGENT_LLM_MODEL env var)
-  --runs-dir PATH Output directory for event logs (default: runs/)
-  --verbose       Print turn-by-turn narration to stdout
+  --rows INT           Grid rows (default: 8, min: 8)
+  --cols INT           Grid columns (default: 8, min: 8)
+  --seed INT           Random seed for reproducible layout
+  --model TEXT         LLM model name (default: reads AGENT_LLM_MODEL env var)
+  --runs-dir PATH      Output directory for event logs (default: runs/)
+  --verbose            Print turn-by-turn narration to stdout
+  --live-viz           Serve the growing run log for the React live dashboard (127.0.0.1)
+  --live-viz-port INT  Port for --live-viz (default: 8765)
+  --live-viz-open      Open the browser on the live visualizer URL (implies --live-viz)
 ```
 
 After each run the console prints:
@@ -215,6 +219,91 @@ Then open http://localhost:8501 in your browser.  From there you can:
 - **Causal graph** — trace failures backward to root cause nodes
 - **Gantt timeline** — see concurrent agent activity and idle gaps
 - **Belief heatmaps** — spatial view of confidence and epistemic divergence
+
+---
+
+## Running the React Mini-Window (replay and live)
+
+The React app under `apps/visualizer` shows the **ground-truth grid** (walls, key, door, exit, agents **A** / **B**) from each `outcome` line in a run log. You can use it in three ways:
+
+1. **Live while a new simulation runs** — the grid updates as the log grows (recommended when you want to *watch* a run).
+2. **Replay after the fact** — load any finished `runs/<run_id>.jsonl` from disk.
+3. **Bundled demo** — no API keys or simulation required; click **Load bundled demo** in the UI.
+
+### What it looks like
+
+This is a real capture of the UI after loading a run (your layout may differ slightly):
+
+![React dungeon visualizer — grid, playback controls, and load run](docs/images/visualizer-ui-screenshot.png)
+
+### One-time setup (Node.js)
+
+```bash
+cd apps/visualizer
+npm install
+npm run dev
+```
+
+Leave this terminal open. Open the URL Vite prints (usually http://localhost:5173).
+
+### A. Live dashboard during a new run (watch the game play out)
+
+You need **two terminals**: one for the React dev server (above), one for the simulation.
+
+1. Start the visualizer: `cd apps/visualizer && npm run dev`
+2. From the **repository root**, run the simulation with the live helper:
+
+```bash
+python -m apps.simulation.main --live-viz
+```
+
+Or add `--live-viz-open` to try to open your browser on the right URL automatically.
+
+The CLI prints a link of the form:
+
+`http://localhost:5173/?run=<run_uuid>&live=1`
+
+Open that link (or refresh if you already had the tab open). The page **polls** the log file while Python writes it, so new moves appear without reloading. Use **Follow latest frame** (on by default) to keep the scrubber on the newest state; turn it off if you want to scrub backward while the run is still going.
+
+**How it works:** `--live-viz` starts a small HTTP server on `127.0.0.1:8765` that exposes `GET /api/runs/<run_id>/raw`. The Vite dev server proxies `/api` to that port (see `apps/visualizer/vite.config.ts`). The browser repeatedly fetches the full log and reparses `outcome` events — simple and robust for typical run sizes.
+
+**If Vite uses another port**, either open the printed URL and fix the origin, or set `LIVE_VIZ_URL` before running Python so the printed link matches your dev server, for example:
+
+```bash
+# Bash — Vite on 5174
+export LIVE_VIZ_URL=http://localhost:5174
+python -m apps.simulation.main --live-viz
+```
+
+```powershell
+# PowerShell
+$env:LIVE_VIZ_URL = "http://localhost:5174"
+python -m apps.simulation.main --live-viz
+```
+
+**If you change the Python API port**, pass `--live-viz-port <port>` and update the Vite proxy `target` in `vite.config.ts` to match (or set `VITE_LIVE_API_BASE_URL=http://127.0.0.1:<port>` when building/serving the frontend so fetches go directly to Python).
+
+### B. Replay a saved run (file picker)
+
+With `npm run dev` running, click **Load .jsonl run** and choose any file under `runs/` (or elsewhere). Playback controls scrub through **outcome** events in file order (so both agents’ steps within the same turn appear as separate frames).
+
+### C. Try it without running the simulation
+
+Click **Load bundled demo** in the UI. The sample file lives at `apps/visualizer/public/sample_visualizer_demo.jsonl`. To regenerate it from a deterministic grid walk:
+
+```bash
+python scripts/generate_sample_visualizer_demo.py
+```
+
+(Requires `PYTHONPATH` set to the repo root, or run from an environment where `pip install -e .` was used.)
+
+### Features
+
+- **Live** polling for in-progress runs (`?run=…&live=1`)
+- **Replay**: play / pause, prev / next, speed, scrubber
+- **Sound** (optional): short Web Audio cues per tool (`move`, `observe`, `interact`, `communicate`); toggle **Sound effects** in the control bar (preference is saved in `localStorage`). If you hear nothing until you click **Play** or the scrubber, that is normal browser autoplay policy.
+- Grid cells: wall, floor, key, locked door, exit; agent tokens **A** / **B**
+- Run metadata and outcome text under the grid
 
 ---
 
@@ -282,6 +371,7 @@ dungeonAgents-ProveAI/
 │   │
 │   ├── simulation/                 # Core dungeon simulation engine
 │   │   ├── main.py                 # Entry point — boots the simulation
+│   │   ├── live_viz_server.py      # 127.0.0.1 HTTP helper for React live polling
 │   │   │
 │   │   ├── environment/            # The dungeon world (source of truth)
 │   │   │   ├── grid.py             # Grid state machine; cell types & layout
@@ -304,6 +394,10 @@ dungeonAgents-ProveAI/
 │   │   └── schemas/                # Pydantic V2 event & state schemas
 │   │       ├── events.py           # Structured event record logged at each agent step
 │   │       └── state.py            # World state, agent state, and perception schemas
+│   │
+│   ├── visualizer/                 # React + Vite live/replay grid UI
+│   │   ├── public/                 # Static assets (e.g. sample_visualizer_demo.jsonl)
+│   │   └── src/                    # App, grid, JSONL parser, live API client
 │   │
 │   └── legibility/                 # Streamlit diagnostic dashboard (Legibility Layer)
 │       ├── app.py                  # Streamlit app entry point
@@ -331,6 +425,9 @@ dungeonAgents-ProveAI/
 │
 ├── runs/                           # Exported simulation run data (structured JSON)
 │   └── .gitkeep                    # Placeholder; runs are saved here as .jsonl files
+│
+├── scripts/                        # Small maintenance utilities
+│   └── generate_sample_visualizer_demo.py  # Writes bundled React demo JSONL
 │
 ├── traces/                         # Exported Langfuse / OTel traces
 │   └── .gitkeep                    # Placeholder; exported traces are stored here

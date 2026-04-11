@@ -24,6 +24,12 @@ Options
     Output directory for event logs (default: runs/).
 --verbose
     Print turn-by-turn narration to stdout.
+--live-viz
+    Serve the run log over HTTP on 127.0.0.1 (see --live-viz-port) for the React live dashboard.
+--live-viz-port INT
+    Port for the live-viz helper (default: 8765).
+--live-viz-open
+    Open the browser on the live visualizer URL (implies --live-viz).
 """
 
 from __future__ import annotations
@@ -90,6 +96,29 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Print turn-by-turn narration to stdout",
     )
+    parser.add_argument(
+        "--live-viz",
+        action="store_true",
+        default=False,
+        help=(
+            "Start a local HTTP helper on 127.0.0.1 (see --live-viz-port) so the "
+            "React visualizer can poll this run as the log grows. "
+            "Start the UI first: cd apps/visualizer && npm run dev"
+        ),
+    )
+    parser.add_argument(
+        "--live-viz-port",
+        type=int,
+        default=8765,
+        metavar="INT",
+        help="Port for --live-viz (default: 8765)",
+    )
+    parser.add_argument(
+        "--live-viz-open",
+        action="store_true",
+        default=False,
+        help="Try to open the default browser on the live visualizer URL (implies --live-viz)",
+    )
     return parser
 
 
@@ -135,6 +164,27 @@ def main(argv: list[str] | None = None) -> int:
     runs_dir.mkdir(parents=True, exist_ok=True)
 
     run_id = RunID(str(uuid.uuid4()))
+
+    live_viz = args.live_viz or args.live_viz_open
+    if live_viz:
+        from apps.simulation.live_viz_server import start_live_viz_server
+
+        start_live_viz_server(runs_dir, port=int(args.live_viz_port))
+        viz_base = os.environ.get("LIVE_VIZ_URL", "http://localhost:5173")
+        live_url = f"{viz_base.rstrip('/')}/?run={run_id}&live=1"
+        print("")
+        print("Live React visualizer (polls this run as it progresses):")
+        print(f"  {live_url}")
+        print(
+            f"  API: http://127.0.0.1:{args.live_viz_port}/api/runs/<run_id>/raw "
+            "(proxied as /api when using Vite dev server)"
+        )
+        print("  Ensure the visualizer is running: cd apps/visualizer && npm run dev")
+        print("")
+        if args.live_viz_open:
+            import webbrowser
+
+            webbrowser.open(live_url, new=1)
 
     config = GameConfig(
         run_id=run_id,
