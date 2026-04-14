@@ -36,8 +36,10 @@ _UNKNOWN_ALPHA = "rgba(13,13,26,0.5)"  # fog of war overlay colour
 # ---------------------------------------------------------------------------
 
 
-def _load_world_states(event_log_path: Path) -> dict[TurnNumber, WorldState]:
-    states: dict[TurnNumber, WorldState] = {}
+def _load_world_states(
+    event_log_path: Path,
+) -> dict[AgentID, dict[TurnNumber, WorldState]]:
+    states: dict[AgentID, dict[TurnNumber, WorldState]] = {}
     with event_log_path.open() as fh:
         for raw_line in fh:
             raw_line = raw_line.strip()
@@ -45,12 +47,12 @@ def _load_world_states(event_log_path: Path) -> dict[TurnNumber, WorldState]:
                 continue
             event = _event_adapter.validate_json(raw_line)
             if isinstance(event, OutcomeEvent):
-                states[event.turn] = event.world_state_after
+                states.setdefault(event.agent_id, {})[event.turn] = event.world_state_after
     return states
 
 
 def _compute_cell_divergence(
-    world_states: dict[TurnNumber, WorldState],
+    world_states: dict[AgentID, dict[TurnNumber, WorldState]],
     agent_id: AgentID,
     up_to_turn: TurnNumber,
 ) -> tuple[np.ndarray, np.ndarray, int, int]:
@@ -64,17 +66,19 @@ def _compute_cell_divergence(
     Returns (z_divergence, z_mask, n_rows, n_cols) where z_mask is True for
     cells the agent has never observed (used to overlay fog-of-war styling).
     """
+    agent_states = world_states.get(agent_id) or next(iter(world_states.values()))
+
     # Determine grid dimensions from any world state
-    sample_world = next(iter(world_states.values()))
+    sample_world = next(iter(agent_states.values()))
     n_rows = len(sample_world.grid)
     n_cols = len(sample_world.grid[0]) if n_rows else 0
 
     believed_grid: dict[Position, CellType] = {}
 
-    for turn in sorted(world_states):
+    for turn in sorted(agent_states):
         if turn > up_to_turn:
             break
-        world = world_states[turn]
+        world = agent_states[turn]
         for row in world.grid:
             for cell in row:
                 if agent_id in cell.is_visible_to:
@@ -82,8 +86,8 @@ def _compute_cell_divergence(
                     believed_grid[pos] = cell.cell_type
 
     # Ground truth at up_to_turn (latest available ≤ up_to_turn)
-    available = [t for t in sorted(world_states) if t <= up_to_turn]
-    current_world = world_states[available[-1]] if available else sample_world
+    available = [t for t in sorted(agent_states) if t <= up_to_turn]
+    current_world = agent_states[available[-1]] if available else sample_world
     ground_truth: dict[Position, CellType] = {
         (cell.row, cell.col): cell.cell_type
         for row in current_world.grid
@@ -124,9 +128,9 @@ def render_heatmaps(
         st.warning("No outcome events found in the event log.")
         return
 
-    turns = sorted(world_states)
-    min_turn = int(turns[0])
-    max_turn = int(turns[-1])
+    all_turns = sorted({t for agent_states in world_states.values() for t in agent_states})
+    min_turn = int(all_turns[0])
+    max_turn = int(all_turns[-1])
 
     col_agent, col_turn = st.columns([1, 2])
     with col_agent:
