@@ -5,7 +5,7 @@ from pathlib import Path
 import streamlit as st
 from pydantic import TypeAdapter
 
-from apps.legibility.analysis.report import CausalIncidentReport, generate_report
+from apps.legibility.analysis.report import CausalIncidentReport, generate_report, generate_report_no_llm
 from apps.legibility.views.causal_graph import render_causal_graph
 from apps.legibility.views.heatmaps import render_heatmaps
 from apps.legibility.views.replay import render_replay
@@ -54,7 +54,12 @@ def _list_runs() -> list[Path]:
 
 @st.cache_data(show_spinner="Generating causal incident report…")
 def _load_report(event_log_path_str: str) -> CausalIncidentReport | None:
-    """Load the TerminationEvent and generate a CausalIncidentReport (cached)."""
+    """Load the TerminationEvent and generate a CausalIncidentReport (cached).
+
+    First attempts to generate an LLM-powered narrative report.  If that fails
+    (e.g. no API key), falls back to a purely structural report computed from
+    the event log and divergence analysis — no LLM required.
+    """
     event_log_path = Path(event_log_path_str)
     termination: TerminationEvent | None = None
     try:
@@ -72,8 +77,14 @@ def _load_report(event_log_path_str: str) -> CausalIncidentReport | None:
     if termination is None:
         return None
 
+    # Try the LLM-powered report first; fall back to the no-LLM version.
     try:
         return generate_report(event_log_path, termination)
+    except Exception:  # noqa: BLE001
+        pass
+
+    try:
+        return generate_report_no_llm(event_log_path, termination)
     except Exception as exc:  # noqa: BLE001
         st.warning(f"Could not generate causal report: {exc}")
         return None
@@ -115,16 +126,22 @@ with st.sidebar:
         selected_path: Path | None = None
     else:
         run_names = [p.name for p in runs]
+        # Default to the demo run if it exists
+        _demo_name = "demo_30turn_run.jsonl"
+        default_idx = run_names.index(_demo_name) if _demo_name in run_names else 0
         selected_name: str = st.selectbox(
             "Select a run:",
             options=run_names,
-            index=0,
+            index=default_idx,
             key="run_selector",
         )
         selected_path = _RUNS_DIR / selected_name
+        if selected_name == _demo_name:
+            st.success("🎮 30-turn demo run loaded")
 
     st.divider()
     st.caption("Launch: `streamlit run apps/legibility/app.py`")
+    st.caption("Generate demo: `python scripts/generate_demo_run.py`")
 
 
 # ---------------------------------------------------------------------------
@@ -149,8 +166,7 @@ with tab2:
     if report is None:
         st.warning(
             "Could not generate a causal incident report for this run. "
-            "Ensure the event log contains a TerminationEvent and that "
-            "the OPENAI_API_KEY (or GOOGLE_API_KEY) environment variable is set."
+            "Ensure the event log contains a TerminationEvent."
         )
     else:
         render_causal_graph(report, selected_path)

@@ -212,6 +212,18 @@ def render_replay(event_log_path: Path, selected_turn: int) -> None:
         world_states, selected_agent, display_turn, n_rows, n_cols
     )
 
+    # ── World-state metadata strip ────────────────────────────────────────
+    pos_a = current_world.agent_positions.get("agent_a", "?")
+    pos_b = current_world.agent_positions.get("agent_b", "?")
+    key_holder = current_world.key_held_by or "on floor"
+    door_status = "🔓 unlocked" if current_world.door_unlocked else "🔒 locked"
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Agent A position", str(tuple(pos_a)) if isinstance(pos_a, list) else str(pos_a))
+    m2.metric("Agent B position", str(tuple(pos_b)) if isinstance(pos_b, list) else str(pos_b))
+    m3.metric("Key held by", key_holder)
+    m4.metric("Door", door_status)
+
     col1, col2 = st.columns(2)
     with col1:
         st.plotly_chart(
@@ -221,20 +233,28 @@ def render_replay(event_log_path: Path, selected_turn: int) -> None:
         )
     with col2:
         label = selected_agent.replace("_", " ").title()
+        explored = int(np.sum(belief_z < _UNKNOWN_VALUE))
+        total = n_rows * n_cols
+        explored_pct = f"{100 * explored // total}% explored" if total else ""
         st.plotly_chart(
             _make_grid_figure(
                 belief_z,
                 belief_text,
-                f"{label} Belief — Turn {display_turn}",
+                f"{label} Belief — Turn {display_turn} ({explored_pct})",
             ),
             use_container_width=True,
             key="replay_belief",
         )
 
     st.markdown(
-        "<p style='color:#888;font-size:11px'>"
-        "■ Wall &nbsp;■ Floor &nbsp;■ Key &nbsp;■ Locked Door &nbsp;"
-        "■ Exit &nbsp;■ Agent &nbsp;■ Unknown (fog of war)"
-        "</p>",
+        "<div style='color:#a0a0a0;font-size:11px;margin-top:2px'>"
+        "<span style='background:#16213e;padding:2px 5px;border-radius:3px'>■</span> Wall &nbsp;"
+        "<span style='background:#0f3460;padding:2px 5px;border-radius:3px'>■</span> Floor &nbsp;"
+        "<span style='background:#e2b714;padding:2px 5px;border-radius:3px;color:#000'>■</span> Key &nbsp;"
+        "<span style='background:#c94040;padding:2px 5px;border-radius:3px'>■</span> Locked Door &nbsp;"
+        "<span style='background:#4fc3f7;padding:2px 5px;border-radius:3px;color:#000'>■</span> Exit &nbsp;"
+        "<span style='background:#9c27b0;padding:2px 5px;border-radius:3px'>■</span> Agent &nbsp;"
+        "<span style='background:#0d0d1a;padding:2px 5px;border-radius:3px;border:1px solid #555'>■</span> Unknown (fog)"
+        "</div>",
         unsafe_allow_html=True,
     )
