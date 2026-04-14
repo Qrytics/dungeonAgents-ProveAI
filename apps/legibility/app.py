@@ -81,12 +81,11 @@ def _load_report(event_log_path_str: str) -> CausalIncidentReport | None:
     try:
         return generate_report(event_log_path, termination)
     except Exception as llm_exc:  # noqa: BLE001
-        st.toast(f"LLM report unavailable ({type(llm_exc).__name__}); using structural analysis.", icon="ℹ️")
+        print(f"LLM report unavailable ({type(llm_exc).__name__}); using structural analysis.")
 
     try:
         return generate_report_no_llm(event_log_path, termination)
-    except Exception as exc:  # noqa: BLE001
-        st.warning(f"Could not generate causal report: {exc}")
+    except Exception:  # noqa: BLE001
         return None
 
 
