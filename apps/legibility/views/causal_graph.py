@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
 from pydantic import TypeAdapter
