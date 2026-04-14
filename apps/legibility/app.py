@@ -80,8 +80,8 @@ def _load_report(event_log_path_str: str) -> CausalIncidentReport | None:
     # Try the LLM-powered report first; fall back to the no-LLM version.
     try:
         return generate_report(event_log_path, termination)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as llm_exc:  # noqa: BLE001
+        st.toast(f"LLM report unavailable ({type(llm_exc).__name__}); using structural analysis.", icon="ℹ️")
 
     try:
         return generate_report_no_llm(event_log_path, termination)

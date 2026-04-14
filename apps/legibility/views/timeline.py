@@ -35,6 +35,10 @@ _AGENT_LABELS: dict[AgentID, str] = {
     "dungeon_master": "Dungeon Master",
 }
 
+# Scale factor for computing marker pixel size from turn count.
+# Chosen so that a 30-turn run gets markers ~14px wide; a 100-turn run gets ~4px.
+_MARKER_SIZE_SCALE_FACTOR = 420
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -140,7 +144,7 @@ def render_timeline(event_log_path: Path) -> None:
             )
 
         # Use taller, wider square markers so they look like proper Gantt bars
-        marker_size = max(12, min(22, int(420 / max(max_turn + 1, 1))))
+        marker_size = max(12, min(22, int(_MARKER_SIZE_SCALE_FACTOR / max(max_turn + 1, 1))))
         fig.add_trace(
             go.Scatter(
                 x=x_vals,
