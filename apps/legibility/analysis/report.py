@@ -209,3 +209,99 @@ def generate_report(
         root_cause_explanation=root_cause_explanation,
         recommendations=recommendations,
     )
+
+
+def generate_report_no_llm(
+    event_log_path: Path,
+    termination_event: TerminationEvent,
+) -> CausalIncidentReport:
+    """Generate a Causal Incident Report using only computed data (no LLM call).
+
+    Produces a structurally complete report with auto-generated narrative text
+    derived directly from the event log and divergence analysis — useful when
+    no API key is available or when a fast, offline analysis is preferred.
+
+    Parameters
+    ----------
+    event_log_path:
+        Path to the ``.jsonl`` run file.
+    termination_event:
+        The parsed ``TerminationEvent`` from the run.
+
+    Returns
+    -------
+    CausalIncidentReport
+        A fully populated report (no LLM required).
+    """
+    timeline = _build_timeline(event_log_path)
+    timeseries = compute_divergence_timeseries(event_log_path)
+    root_cause_turns: dict[AgentID, list[TurnNumber]] = find_divergence_spikes(timeseries)
+
+    reason = termination_event.reason
+    final_turn = int(termination_event.final_turn)
+
+    # Auto-compose a summary based on reason
+    if reason == "win":
+        summary = (
+            f"Both agents successfully reached the exit at turn {final_turn}. "
+            "Agent A retrieved the key and unlocked the door; Agent B secured the exit. "
+            "All mission objectives were completed with no critical divergence detected."
+        )
+        explanation = (
+            "The simulation ended in a WIN. No significant epistemic divergence spikes "
+            "were detected — agents maintained accurate world models throughout the run. "
+            "Effective communication between agents enabled coordinated task completion."
+        )
+        recommendations = [
+            "Reduce turn count by optimising initial exploration (agents explored redundant areas).",
+            "Consider giving agents pre-shared knowledge of the dungeon layout to skip early fog-of-war exploration.",
+            "Evaluate whether one agent could retrieve the key and reach the exit independently in fewer turns.",
+        ]
+    elif reason == "turn_limit":
+        spike_agents = [a for a, turns in root_cause_turns.items() if turns]
+        spike_summary = (
+            f"Divergence spikes detected for: {', '.join(spike_agents)}."
+            if spike_agents else "No significant divergence spikes detected."
+        )
+        summary = (
+            f"The simulation reached the turn limit ({final_turn} turns) without agents winning. "
+            f"{spike_summary} Agents failed to complete the key–door–exit sequence in time."
+        )
+        explanation = (
+            "Agents hit the turn limit. "
+            + (f"Divergence spikes for {spike_agents} indicate belief-reality gaps that may have caused suboptimal decisions. "
+               if spike_agents else "")
+            + "Review agent pathfinding and coordination efficiency."
+        )
+        recommendations = [
+            "Add explicit goal-oriented pathfinding to prevent aimless exploration.",
+            "Improve inter-agent communication frequency to share key/exit locations earlier.",
+            "Review divergence spike turns to identify where beliefs diverged from reality.",
+        ]
+    else:
+        # stuck
+        summary = (
+            f"The simulation terminated at turn {final_turn} because both agents became stuck — "
+            "no successful action was recorded for 10 consecutive turns."
+        )
+        explanation = (
+            "Both agents stopped making progress. This is often caused by wall-bumping loops "
+            "or communication failures that prevented agents from discovering new paths."
+        )
+        recommendations = [
+            "Add stuck-detection to agent reasoning so they actively try alternative directions.",
+            "Increase communication frequency to break coordination deadlocks.",
+            "Consider sharing partial map data between agents to reveal blocked corridors sooner.",
+        ]
+
+    return CausalIncidentReport(
+        run_id=termination_event.run_id,
+        termination_reason=termination_event.reason,
+        final_turn=termination_event.final_turn,
+        summary=summary,
+        timeline=timeline,
+        root_cause_turns=root_cause_turns,
+        root_cause_explanation=explanation,
+        recommendations=recommendations,
+    )
+

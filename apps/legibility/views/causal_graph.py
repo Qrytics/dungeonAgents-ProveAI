@@ -170,27 +170,106 @@ def _build_dag(report: CausalIncidentReport, event_log_path: Path) -> Network:
 # ---------------------------------------------------------------------------
 
 
-def render_causal_graph(report: CausalIncidentReport, event_log_path: Path) -> None:
-    """Render a directed acyclic graph showing the causal chain of failure.
+def _divergence_chart(event_log_path: Path) -> go.Figure:
+    """Return a Plotly line chart of per-agent divergence over turns."""
+    from apps.legibility.analysis.divergence import compute_divergence_timeseries
 
-    Nodes represent divergence spike events, agent decisions, outcomes, and
-    the simulation termination.  Edges represent causal relationships.
-    Rendered via pyvis embedded in a Streamlit HTML component.
+    ts = compute_divergence_timeseries(event_log_path)
+
+    fig = go.Figure()
+    palette = {"agent_a": "#e2b714", "agent_b": "#4fc3f7"}
+
+    for agent_id, pairs in ts.items():
+        if not pairs:
+            continue
+        turns = [int(t) for t, _ in pairs]
+        scores = [s for _, s in pairs]
+        fig.add_trace(
+            go.Scatter(
+                x=turns,
+                y=scores,
+                mode="lines+markers",
+                name=agent_id.replace("_", " ").title(),
+                line=dict(color=palette.get(agent_id, "#ffffff"), width=2),
+                marker=dict(size=5),
+            )
+        )
+
+    fig.update_layout(
+        title=dict(text="Epistemic Divergence over Time", font=dict(color="#e0e0e0", size=14)),
+        xaxis=dict(title="Turn", color="#e0e0e0", gridcolor="#2a2a4a", zeroline=False, dtick=2),
+        yaxis=dict(
+            title="Divergence score",
+            color="#e0e0e0",
+            gridcolor="#2a2a4a",
+            zeroline=False,
+            range=[-0.05, 1.05],
+        ),
+        paper_bgcolor="#0d0d1a",
+        plot_bgcolor="#1a1a2e",
+        font=dict(color="#e0e0e0"),
+        legend=dict(bgcolor="#1a1a2e", bordercolor="#444", borderwidth=1, font=dict(color="#e0e0e0")),
+        margin=dict(l=60, r=40, t=50, b=50),
+        height=260,
+        shapes=[
+            dict(
+                type="line",
+                x0=0, x1=1, xref="paper",
+                y0=0.3, y1=0.3,
+                line=dict(color="#c94040", dash="dash", width=1),
+            )
+        ],
+        annotations=[
+            dict(
+                x=1, y=0.3, xref="paper", yref="y",
+                text="spike threshold (0.30)",
+                showarrow=False,
+                font=dict(color="#c94040", size=10),
+                xanchor="right",
+            )
+        ],
+    )
+    return fig
+
+
+def render_causal_graph(report: CausalIncidentReport, event_log_path: Path) -> None:
+    """Render the causal analysis panel.
+
+    Shows:
+    * Run metadata and outcome summary.
+    * Epistemic divergence chart (per-agent divergence over turns).
+    * Interactive DAG (pyvis) showing divergence-spike → decision → outcome chains.
+    * Root cause explanation and recommendations.
+    * Scrollable event timeline.
     """
-    st.subheader("Causal Failure Graph")
+    # ── Header ──────────────────────────────────────────────────────────
+    outcome_icon = "🏆" if report.termination_reason == "win" else "💀"
+    reason_label = {
+        "win": "WIN — both agents reached the exit",
+        "turn_limit": "TURN LIMIT — agents ran out of turns",
+        "stuck": "STUCK — agents stopped making progress",
+    }.get(report.termination_reason, report.termination_reason)
+
     st.markdown(
         f"<p style='color:#888;font-size:12px'>"
-        f"Run <code>{report.run_id}</code> · "
-        f"terminated on turn {report.final_turn} ({report.termination_reason})"
+        f"{outcome_icon} Run <code>{report.run_id}</code> · "
+        f"Turn {report.final_turn} · <strong style='color:#e0e0e0'>{reason_label}</strong>"
         f"</p>",
         unsafe_allow_html=True,
     )
 
+    # ── Summary ─────────────────────────────────────────────────────────
+    st.info(report.summary)
+
+    # ── Divergence chart ─────────────────────────────────────────────────
+    st.plotly_chart(_divergence_chart(event_log_path), use_container_width=True, key="causal_div_chart")
+
+    # ── DAG ─────────────────────────────────────────────────────────────
+    st.subheader("Causal Chain Graph")
     dag = _build_dag(report, event_log_path)
 
-    # Render to HTML string and embed via st.components
     html_str = dag.generate_html()
-    components.html(html_str, height=540, scrolling=False)
+    components.html(html_str, height=480, scrolling=False)
 
     # Legend
     st.markdown(
@@ -203,8 +282,23 @@ def render_causal_graph(report: CausalIncidentReport, event_log_path: Path) -> N
         unsafe_allow_html=True,
     )
 
-    with st.expander("Root cause explanation"):
-        st.markdown(
-            f"<p style='color:#e0e0e0'>{report.root_cause_explanation}</p>",
-            unsafe_allow_html=True,
-        )
+    # ── Root cause + recommendations ─────────────────────────────────────
+    col_exp, col_rec = st.columns(2)
+    with col_exp:
+        with st.expander("Root cause explanation", expanded=True):
+            st.markdown(
+                f"<p style='color:#e0e0e0;font-size:0.93rem'>{report.root_cause_explanation}</p>",
+                unsafe_allow_html=True,
+            )
+    with col_rec:
+        with st.expander("Recommendations", expanded=True):
+            for i, rec in enumerate(report.recommendations, 1):
+                st.markdown(
+                    f"<p style='color:#b8e0b8;font-size:0.93rem'>{i}. {rec}</p>",
+                    unsafe_allow_html=True,
+                )
+
+    # ── Event timeline ───────────────────────────────────────────────────
+    with st.expander(f"Full event timeline ({len(report.timeline)} events)"):
+        timeline_text = "\n".join(report.timeline)
+        st.code(timeline_text, language=None)
